@@ -1,0 +1,39 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Train World Model",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/train_offline_dreamer.py",
+            "args": ["--phase", "world_model"],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Train Actor-Critic",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/train_offline_dreamer.py",
+            "args": ["--phase", "actor_critic"],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Test Policy",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/test_policy.py",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Collect Data",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/collect_lunarlander_data.py",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        }
+    ]
+}
