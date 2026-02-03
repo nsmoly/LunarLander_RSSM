@@ -46,7 +46,7 @@ def main():
 
         while True:
             dist = actor(z)
-            action = dist.probs.argmax(dim=-1).item()
+            action = dist.sample().item()
             print(f"Action: {action}, Probs: {dist.probs.cpu().numpy().flatten()}")
 
             next_obs, reward, terminated, truncated, info = env.step(action)

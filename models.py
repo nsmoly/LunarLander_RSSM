@@ -48,13 +48,16 @@ class RSSM(nn.Module):
         return z, mean, logstd, h
 
     def prior(self, h, action):
+        # Update recurrent state using action-only input
+        zeros_obs = torch.zeros(h.size(0), self.hidden_dim, device=h.device)
+        h = self.rnn(torch.cat([zeros_obs, action], dim=-1), h)
         x = torch.cat([h, action], dim=-1)
         out = self.prior_net(x)
         mean, logstd = out.chunk(2, dim=-1)
         logstd = logstd.clamp(-5, 2)
         std = torch.exp(logstd)
         z = mean + std * torch.randn_like(std)
-        return z, mean, logstd
+        return z, mean, logstd, h
 
 class WorldModel(nn.Module):
     def __init__(self, obs_dim, action_dim, latent_dim=64, hidden_dim=128):
@@ -67,6 +70,8 @@ class WorldModel(nn.Module):
         )
         self.reward_head = nn.Sequential(
             nn.Linear(latent_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, 1),
         )

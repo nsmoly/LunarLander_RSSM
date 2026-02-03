@@ -13,10 +13,17 @@ from torch.utils.data import Dataset, DataLoader
 from models import WorldModel, Actor, Critic
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+CHECKPOINT_DIR = "checkpoints"
 
-def get_latest_checkpoint(model_name):
+def log_message(message, log_path=None):
+    print(message)
+    if log_path:
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(message + "\n")
+
+def get_latest_checkpoint(model_name, directory=CHECKPOINT_DIR):
     """Find the most recent checkpoint for a given model name."""
-    pattern = f"{model_name}_*.pt"
+    pattern = os.path.join(directory, f"{model_name}_*.pt")
     checkpoints = glob.glob(pattern)
     if not checkpoints:
         return None
@@ -25,12 +32,13 @@ def get_latest_checkpoint(model_name):
     checkpoints.sort(key=os.path.getmtime, reverse=True)
     return checkpoints[0]
 
-def save_checkpoint_with_timestamp(model, model_name, epoch):
+def save_checkpoint_with_timestamp(model, model_name, epoch, directory=CHECKPOINT_DIR, log_path=None):
     """Save a model checkpoint with timestamp."""
+    os.makedirs(directory, exist_ok=True)
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{model_name}_{timestamp}_epoch_{epoch}.pt"
+    filename = os.path.join(directory, f"{model_name}_{timestamp}_epoch_{epoch}.pt")
     torch.save(model.state_dict(), filename)
-    print(f"Saved checkpoint: {filename}")
+    log_message(f"Saved checkpoint: {filename}", log_path)
     return filename
 
 class LunarDataset(Dataset):
@@ -84,13 +92,13 @@ def validate_world_model(world_model, val_dataloader, beta_kl=1.0, loss_weights=
             rewards = rewards.to(DEVICE)
 
             batch_size = obs.size(0)
-            action_onehot = torch.zeros(batch_size, 4, device=DEVICE)
+            action_onehot = torch.zeros(batch_size, world_model.rssm.action_dim, device=DEVICE)
             action_onehot.scatter_(1, actions.unsqueeze(-1), 1.0)
 
             h = world_model.rssm.init_hidden(batch_size, DEVICE)
 
             z_post, mean_post, logstd_post, h = world_model.rssm.posterior(obs, h)
-            z_prior, mean_prior, logstd_prior = world_model.rssm.prior(h, action_onehot)
+            z_prior, mean_prior, logstd_prior, h = world_model.rssm.prior(h, action_onehot)
 
             obs_pred = world_model.reconstruct_obs(z_post)
             reward_pred = world_model.predict_reward(z_post)
@@ -138,12 +146,16 @@ def validate_world_model(world_model, val_dataloader, beta_kl=1.0, loss_weights=
         'reward_sign_acc': avg_reward_sign_acc
     }
 
-def train_world_model(world_model, train_dataloader, val_dataloader, epochs=10, lr=3e-4, beta_kl=1.0, val_freq=10, loss_weights=(1.0, 1.0, 1.0), checkpoint_freq=100):
+def train_world_model(world_model, train_dataloader, val_dataloader, epochs=10, lr=3e-4, beta_kl=1.0, val_freq=10, loss_weights=(1.0, 1.0, 1.0), checkpoint_freq=100, start_epoch=0, log_path=None):
     world_model.train()
     opt = optim.AdamW(world_model.parameters(), lr=lr)
     mse = nn.MSELoss()
 
-    for epoch in range(epochs):
+    if start_epoch >= epochs:
+        log_message(f"Start epoch {start_epoch} is >= total epochs {epochs}; nothing to train.", log_path)
+        return
+
+    for epoch in range(start_epoch + 1, epochs + 1):
         # Training phase
         train_loss = 0.0
         for batch in train_dataloader:
@@ -154,13 +166,13 @@ def train_world_model(world_model, train_dataloader, val_dataloader, epochs=10, 
             rewards = rewards.to(DEVICE)
 
             batch_size = obs.size(0)
-            action_onehot = torch.zeros(batch_size, 4, device=DEVICE)
+            action_onehot = torch.zeros(batch_size, world_model.rssm.action_dim, device=DEVICE)
             action_onehot.scatter_(1, actions.unsqueeze(-1), 1.0)
 
             h = world_model.rssm.init_hidden(batch_size, DEVICE)
 
             z_post, mean_post, logstd_post, h = world_model.rssm.posterior(obs, h)
-            z_prior, mean_prior, logstd_prior = world_model.rssm.prior(h, action_onehot)
+            z_prior, mean_prior, logstd_prior, h = world_model.rssm.prior(h, action_onehot)
 
             obs_pred = world_model.reconstruct_obs(z_post)
             reward_pred = world_model.predict_reward(z_post)
@@ -182,17 +194,17 @@ def train_world_model(world_model, train_dataloader, val_dataloader, epochs=10, 
         train_loss /= len(train_dataloader.dataset)
         
         # Validation phase every val_freq epochs
-        if (epoch + 1) % val_freq == 0:
+        if epoch % val_freq == 0:
             val_metrics = validate_world_model(world_model, val_dataloader, beta_kl, loss_weights)
-            print(f"[WorldModel] Epoch {epoch+1}, train_loss={train_loss:.4f}, val_loss={val_metrics['loss']:.4f}")
-            print(f"  Validation Metrics - Obs MAE: {val_metrics['obs_mae']:.4f}, Obs RMSE: {val_metrics['obs_rmse']:.4f}")
-            print(f"  Reward MAE: {val_metrics['reward_mae']:.4f}, Reward RMSE: {val_metrics['reward_rmse']:.4f}, Reward Sign Acc: {val_metrics['reward_sign_acc']:.3f}")
+            log_message(f"[WorldModel] Epoch {epoch}, train_loss={train_loss:.4f}, val_loss={val_metrics['loss']:.4f}", log_path)
+            log_message(f"  Validation Metrics - Obs MAE: {val_metrics['obs_mae']:.4f}, Obs RMSE: {val_metrics['obs_rmse']:.4f}", log_path)
+            log_message(f"  Reward MAE: {val_metrics['reward_mae']:.4f}, Reward RMSE: {val_metrics['reward_rmse']:.4f}, Reward Sign Acc: {val_metrics['reward_sign_acc']:.3f}", log_path)
         else:
-            print(f"[WorldModel] Epoch {epoch+1}, train_loss={train_loss:.4f}")
+            log_message(f"[WorldModel] Epoch {epoch}, train_loss={train_loss:.4f}", log_path)
 
         # Save checkpoint every checkpoint_freq epochs
-        if (epoch + 1) % checkpoint_freq == 0:
-            save_checkpoint_with_timestamp(world_model, "world_model", epoch + 1)
+        if epoch % checkpoint_freq == 0:
+            save_checkpoint_with_timestamp(world_model, "world_model", epoch, log_path=log_path)
 
 def compute_auxiliary_rewards(observations, upright_weight=0.1, downward_speed_weight=0.05):
     """
@@ -235,10 +247,10 @@ def imagine_rollout(world_model, actor, start_obs, horizon=15):
     for t in range(horizon):
         dist = actor(z)
         a = dist.sample()
-        a_onehot = torch.zeros(batch_size, 4, device=DEVICE)
+        a_onehot = torch.zeros(batch_size, world_model.rssm.action_dim, device=DEVICE)
         a_onehot.scatter_(1, a.unsqueeze(-1), 1.0)
 
-        z, mean_prior, logstd_prior = world_model.rssm.prior(h, a_onehot)
+        z, mean_prior, logstd_prior, h = world_model.rssm.prior(h, a_onehot)
         r = world_model.predict_reward(z)
         obs_imagined = world_model.reconstruct_obs(z)  # Reconstruct observation from latent
 
@@ -255,7 +267,7 @@ def imagine_rollout(world_model, actor, start_obs, horizon=15):
 
 def train_actor_critic(world_model, actor, critic, dataloader,
                        epochs=10, lr=3e-4, gamma=0.99, lambda_gae=0.95,
-                       imagination_horizon=15, loss_weights=(1.0, 1.0), entropy_coeff=0.01, checkpoint_freq=100, aux_rewards_config=None, start_epoch=0):
+                       imagination_horizon=15, loss_weights=(1.0, 1.0), entropy_coeff=0.01, checkpoint_freq=100, aux_rewards_config=None, start_epoch=0, log_path=None):
     actor.train()
     critic.train()
     opt_actor = optim.AdamW(actor.parameters(), lr=lr)
@@ -308,6 +320,7 @@ def train_actor_critic(world_model, actor, critic, dataloader,
             dist = actor(zs.reshape(-1, zs.size(-1)))
             log_probs = dist.log_prob(imagined_actions.reshape(-1))
             adv_flat = adv.reshape(-1).detach()
+            adv_flat = (adv_flat - adv_flat.mean()) / (adv_flat.std() + 1e-8)
 
             actor_loss = loss_weights[0] * (-(log_probs * adv_flat).mean() - entropy_coeff * dist.entropy().mean())
 
@@ -362,15 +375,15 @@ def train_actor_critic(world_model, actor, critic, dataloader,
         avg_aux_upright = total_aux_upright / num_batches
         avg_aux_downward = total_aux_downward / num_batches
 
-        print(f"[ActorCritic] Epoch {epoch+1}, actor_loss={avg_actor_loss:.4f}, critic_loss={avg_critic_loss:.4f}")
-        print(f"  Metrics - Imagined Reward: {avg_imagined_reward:.4f}, Value MAE: {avg_value_mae:.4f}, Entropy: {avg_entropy:.4f}")
-        print(f"  Grad Norms - Actor: {avg_actor_grad_norm:.4f}, Critic: {avg_critic_grad_norm:.4f}")
-        print(f"  Aux Rewards - Upright: {avg_aux_upright:.4f}, Downward Penalty: {avg_aux_downward:.4f}")
+        log_message(f"[ActorCritic] Epoch {epoch}, actor_loss={avg_actor_loss:.4f}, critic_loss={avg_critic_loss:.4f}", log_path)
+        log_message(f"  Metrics - Imagined Reward: {avg_imagined_reward:.4f}, Value MAE: {avg_value_mae:.4f}, Entropy: {avg_entropy:.4f}", log_path)
+        log_message(f"  Grad Norms - Actor: {avg_actor_grad_norm:.4f}, Critic: {avg_critic_grad_norm:.4f}", log_path)
+        log_message(f"  Aux Rewards - Upright: {avg_aux_upright:.4f}, Downward Penalty: {avg_aux_downward:.4f}", log_path)
 
         # Save checkpoints every checkpoint_freq epochs
-        if (epoch + 1) % checkpoint_freq == 0:
-            save_checkpoint_with_timestamp(actor, "actor", epoch + 1)
-            save_checkpoint_with_timestamp(critic, "critic", epoch + 1)
+        if epoch % checkpoint_freq == 0:
+            save_checkpoint_with_timestamp(actor, "actor", epoch, log_path=log_path)
+            save_checkpoint_with_timestamp(critic, "critic", epoch, log_path=log_path)
 
 def main():
     parser = argparse.ArgumentParser(description="Train Dreamer offline on LunarLander")
@@ -387,6 +400,7 @@ def main():
     phase_config = config[args.phase]
 
     if args.phase == 'world_model':
+        log_path = os.path.join(".", "train_worldmodel_logs.txt")
         # Load separate train and validation datasets for world model training
         train_dataset = LunarDataset("lunarlander_train_dataset.npz")
         val_dataset = LunarDataset("lunarlander_val_dataset.npz")
@@ -407,13 +421,19 @@ def main():
         
         # Load the most recent world model checkpoint
         latest_checkpoint = get_latest_checkpoint("world_model")
+        start_epoch = 0
         if latest_checkpoint:
             world_model.load_state_dict(torch.load(latest_checkpoint, map_location=DEVICE))
-            print(f"Loaded world model checkpoint: {latest_checkpoint}")
+            log_message(f"Loaded world model checkpoint: {latest_checkpoint}", log_path)
+            try:
+                epoch_str = latest_checkpoint.split('_epoch_')[-1].split('.')[0]
+                start_epoch = int(epoch_str)
+            except ValueError:
+                log_message("Warning: could not parse epoch from checkpoint filename; starting from epoch 0", log_path)
         elif os.path.exists("world_model.pt"):
             # Fallback to old naming scheme
             world_model.load_state_dict(torch.load("world_model.pt", map_location=DEVICE))
-            print("Loaded existing world model checkpoint (old naming)")
+            log_message("Loaded existing world model checkpoint (old naming)", log_path)
         
         epochs = phase_config.get('epochs', 20)
         lr = phase_config.get('lr', 3e-4)
@@ -427,18 +447,19 @@ def main():
         reward_weight = loss_weights.get('reward', 1.0)
         kl_weight = loss_weights.get('kl', 1.0)
         
-        print(f"Training world model for {epochs} epochs with lr={lr}, beta_kl={beta_kl}, val_freq={val_freq}...")
-        print(f"Model capacity: latent_dim={latent_dim}, hidden_dim={hidden_dim}")
-        print(f"Loss weights: recon={recon_weight}, reward={reward_weight}, kl={kl_weight}")
-        print(f"Checkpoint frequency: every {checkpoint_freq} epochs")
+        log_message(f"Training world model for {epochs} epochs with lr={lr}, beta_kl={beta_kl}, val_freq={val_freq}... (starting from epoch {start_epoch})", log_path)
+        log_message(f"Model capacity: latent_dim={latent_dim}, hidden_dim={hidden_dim}", log_path)
+        log_message(f"Loss weights: recon={recon_weight}, reward={reward_weight}, kl={kl_weight}", log_path)
+        log_message(f"Checkpoint frequency: every {checkpoint_freq} epochs", log_path)
         train_world_model(world_model, train_dataloader, val_dataloader, epochs=epochs, lr=lr, 
                          beta_kl=beta_kl, val_freq=val_freq, loss_weights=(recon_weight, reward_weight, kl_weight),
-                         checkpoint_freq=checkpoint_freq)
+                         checkpoint_freq=checkpoint_freq, start_epoch=start_epoch, log_path=log_path)
         # Save final model (in addition to checkpoints)
         torch.save(world_model.state_dict(), "world_model.pt")
-        print("Final world model saved to world_model.pt")
+        log_message("Final world model saved to world_model.pt", log_path)
 
     elif args.phase == 'actor_critic':
+        log_path = os.path.join(".", "train_actorcritic_logs.txt")
         # For actor-critic, use the combined dataset (or you could use train_dataset)
         dataset = LunarDataset("lunarlander_train_dataset.npz")  # Use train data for actor-critic training
         
@@ -465,25 +486,25 @@ def main():
         start_epoch = 0
         if latest_actor:
             actor.load_state_dict(torch.load(latest_actor, map_location=DEVICE))
-            print(f"Loaded actor checkpoint: {latest_actor}")
+            log_message(f"Loaded actor checkpoint: {latest_actor}", log_path)
             # Extract epoch from filename, e.g., actor_..._epoch_10.pt -> 10
             epoch_str = latest_actor.split('_epoch_')[-1].split('.')[0]
             start_epoch = int(epoch_str)
         elif os.path.exists("actor.pt"):
             actor.load_state_dict(torch.load("actor.pt", map_location=DEVICE))
-            print("Loaded existing actor checkpoint (old naming)")
+            log_message("Loaded existing actor checkpoint (old naming)", log_path)
         else:
-            print("No actor checkpoint found, starting from scratch")
+            log_message("No actor checkpoint found, starting from scratch", log_path)
 
         latest_critic = get_latest_checkpoint("critic")
         if latest_critic:
             critic.load_state_dict(torch.load(latest_critic, map_location=DEVICE))
-            print(f"Loaded critic checkpoint: {latest_critic}")
+            log_message(f"Loaded critic checkpoint: {latest_critic}", log_path)
         elif os.path.exists("critic.pt"):
             critic.load_state_dict(torch.load("critic.pt", map_location=DEVICE))
-            print("Loaded existing critic checkpoint (old naming)")
+            log_message("Loaded existing critic checkpoint (old naming)", log_path)
         else:
-            print("No critic checkpoint found, starting from scratch")
+            log_message("No critic checkpoint found, starting from scratch", log_path)
 
         epochs = phase_config.get('epochs', 20)
         lr = phase_config.get('lr', 3e-4)
@@ -499,20 +520,20 @@ def main():
         # Get auxiliary rewards config
         aux_rewards_config = phase_config.get('auxiliary_rewards', {})
         
-        print(f"Training actor-critic for {epochs} epochs with lr={lr}, imagination_horizon={imagination_horizon}... (starting from epoch {start_epoch})")
-        print(f"Model capacity: latent_dim={latent_dim}, hidden_dim={hidden_dim}")
-        print(f"Loss weights: actor={actor_weight}, critic={critic_weight}")
-        print(f"Auxiliary rewards: upright={aux_rewards_config.get('upright_pose_weight', 0.1)}, downward_speed={aux_rewards_config.get('downward_speed_weight', 0.05)}")
-        print(f"Checkpoint frequency: every {checkpoint_freq} epochs")
+        log_message(f"Training actor-critic for {epochs} epochs with lr={lr}, imagination_horizon={imagination_horizon}... (starting from epoch {start_epoch})", log_path)
+        log_message(f"Model capacity: latent_dim={latent_dim}, hidden_dim={hidden_dim}", log_path)
+        log_message(f"Loss weights: actor={actor_weight}, critic={critic_weight}", log_path)
+        log_message(f"Auxiliary rewards: upright={aux_rewards_config.get('upright_pose_weight', 0.1)}, downward_speed={aux_rewards_config.get('downward_speed_weight', 0.05)}", log_path)
+        log_message(f"Checkpoint frequency: every {checkpoint_freq} epochs", log_path)
         train_actor_critic(world_model, actor, critic, dataloader,
                            epochs=epochs, lr=lr, imagination_horizon=imagination_horizon, 
                            loss_weights=(actor_weight, critic_weight), entropy_coeff=entropy_coeff, checkpoint_freq=checkpoint_freq,
-                           aux_rewards_config=aux_rewards_config, start_epoch=start_epoch)
+                           aux_rewards_config=aux_rewards_config, start_epoch=start_epoch, log_path=log_path)
 
         # Save final models (in addition to checkpoints)
         torch.save(actor.state_dict(), "actor.pt")
         torch.save(critic.state_dict(), "critic.pt")
-        print("Final actor and critic saved to actor.pt and critic.pt")
+        log_message("Final actor and critic saved to actor.pt and critic.pt", log_path)
 
 if __name__ == "__main__":
     main()
