@@ -18,19 +18,25 @@ world_model:
   
 actor_critic:
   action_dim: 4
+  # Horizon: past_horizon (warm-up) + future_horizon (imagination) = horizon. Must satisfy P+F=H.
+  horizon: 20
+  past_horizon: 5    # P: warm-up steps with real (obs, action)
+  future_horizon: 15  # F: imagination rollout steps
+  lambda_gae: 0.95   # GAE lambda: 0=1-step TD, 1=full returns, 0.95=typical hybrid
   capacity:
     latent_dim: 64
     hidden_dim: 128
   loss_weights:
     actor: 1.0
     critic: 0.25
-    entropy: 0.07
+    entropy: 0.4   # Higher to prevent policy collapse (was 0.2)
   auxiliary_rewards:
-    upright_pose_weight: 0.0 # 0.01    # Reward for being upright (angle close to 0)
-    downward_speed_weight: 0.0 # 0.005 # Penalty for downward velocity
+    upright_pose_weight: 0.01   # Reward for being upright (angle close to 0)
+    downward_speed_weight: 0.005  # Penalty for downward velocity (soft landing)
+  advantage_clip: 3.0   # Clip standardized advantages to ±3 for stability
+  actor_grad_clip: 10.0 # Gradient clipping for actor (tighter than 100 for stability)
   epochs: 200
-  lr: 0.00005
-  imagination_horizon: 50
+  lr: 0.00002   # Lower for more stable updates (was 5e-5) 
   batch_size: 64
   checkpoint_freq: 10  # Save checkpoint every 10 epochs
   

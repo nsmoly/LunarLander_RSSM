@@ -1,36 +1,62 @@
 # test_policy.py
+import argparse
+import os
 import gym
 import torch
 import numpy as np
-import os
+import yaml
 
 from models import WorldModel, Actor
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
+def load_config(config_path):
+    if not os.path.exists(config_path):
+        return 64, 128, 4
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f) or {}
+    wm = config.get("world_model", {})
+    cap = wm.get("capacity", {})
+    latent_dim = int(cap.get("latent_dim", 64))
+    hidden_dim = int(cap.get("hidden_dim", 128))
+    action_dim = int(wm.get("action_dim", 4))
+    return latent_dim, hidden_dim, action_dim
+
+
 def main():
+    parser = argparse.ArgumentParser(description="Test trained policy in LunarLander")
+    parser.add_argument("--config", default="config.yaml", help="Path to config file")
+    parser.add_argument("--world_model", default=None,
+                        help="World model checkpoint (default: world_model.pt)")
+    parser.add_argument("--actor", default=None,
+                        help="Actor checkpoint (default: actor.pt)")
+    args = parser.parse_args()
+
+    latent_dim, hidden_dim, action_dim = load_config(args.config)
+
     env = gym.make("LunarLander-v2", render_mode="human")
     obs, _ = env.reset()
 
     obs_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.n
 
-    world_model = WorldModel(obs_dim, action_dim, latent_dim=64, hidden_dim=128).to(DEVICE)
-    actor = Actor(latent_dim=64, action_dim=action_dim, hidden_dim=128).to(DEVICE)
+    world_model = WorldModel(obs_dim, action_dim, latent_dim=latent_dim, hidden_dim=hidden_dim).to(DEVICE)
+    actor = Actor(latent_dim=latent_dim, action_dim=action_dim, hidden_dim=hidden_dim).to(DEVICE)
 
-    # Load models from fixed checkpoint files
-    if os.path.exists("world_model.pt"):
-        world_model.load_state_dict(torch.load("world_model.pt", map_location=DEVICE))
-        print("Loaded world model from world_model.pt")
+    wm_path = args.world_model or "world_model.pt"
+    if wm_path and os.path.exists(wm_path):
+        world_model.load_state_dict(torch.load(wm_path, map_location=DEVICE))
+        print(f"Loaded world model from {wm_path}")
     else:
-        print("Warning: world_model.pt not found!")
+        print(f"Warning: {wm_path} not found!")
         return
 
-    if os.path.exists("actor.pt"):
-        actor.load_state_dict(torch.load("actor.pt", map_location=DEVICE))
-        print("Loaded actor from actor.pt")
+    actor_path = args.actor or "actor.pt"
+    if actor_path and os.path.exists(actor_path):
+        actor.load_state_dict(torch.load(actor_path, map_location=DEVICE))
+        print(f"Loaded actor from {actor_path}")
     else:
-        print("Warning: actor.pt not found!")
+        print(f"Warning: {actor_path} not found!")
         return
 
     world_model.eval()

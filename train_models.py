@@ -133,7 +133,7 @@ class SequenceDataset(Dataset):
 
 
 # -----------------------------------------------------------------------------
-# Actor-critic: TransitionDataset for single-transition batches
+# Actor-critic: TransitionDataset for single-transition batches (legacy)
 # -----------------------------------------------------------------------------
 class TransitionDataset(Dataset):
     """Single transitions for actor-critic imagination init."""
@@ -156,6 +156,54 @@ class TransitionDataset(Dataset):
             self.dones[idx],
             self.next_obs[idx],
         )
+
+
+# -----------------------------------------------------------------------------
+# Actor-critic: WarmupDataset for episode+start sampling with warm-up
+# -----------------------------------------------------------------------------
+class ActorCriticWarmupDataset(Dataset):
+    """Samples (episode, start) where start + horizon <= first_done. Returns obs_past, actions_past for warm-up."""
+    def __init__(self, path, horizon, past_horizon, future_horizon, action_dim):
+        assert past_horizon + future_horizon == horizon, (
+            f"past_horizon + future_horizon must equal horizon; got P={past_horizon} + F={future_horizon} != H={horizon}"
+        )
+        data = np.load(path)
+        self.obs = data["obs"].astype(np.float32)
+        self.actions = data["actions"].astype(np.int64)
+        self.dones = data["dones"].astype(np.int64)
+        self.ep_index = data["ep_index"].astype(np.int64)
+        self.step_index = data["step_index"].astype(np.int64)
+        self.horizon = int(horizon)
+        self.past_horizon = int(past_horizon)
+        self.future_horizon = int(future_horizon)
+        self.obs_dim = self.obs.shape[1]
+        self.action_dim = int(action_dim)
+
+        self.episode_ids = np.unique(self.ep_index)
+        self.start_positions = []  # (ep_pos, start_step)
+        for ep_id in self.episode_ids:
+            idxs = np.where(self.ep_index == ep_id)[0]
+            if idxs.size == 0:
+                continue
+            order = np.argsort(self.step_index[idxs], kind="stable")
+            idxs = idxs[order]
+            first_done = np.where(self.dones[idxs] == 1)[0]
+            first_done_idx = int(first_done[0]) if first_done.size > 0 else len(idxs)
+            max_start = first_done_idx - self.horizon
+            if max_start < 0:
+                continue
+            for start in range(max_start + 1):
+                self.start_positions.append((idxs, start))
+
+    def __len__(self):
+        return len(self.start_positions)
+
+    def __getitem__(self, idx):
+        idxs, start = self.start_positions[idx]
+        P = self.past_horizon
+        obs_past = self.obs[idxs[start : start + P]].astype(np.float32)  # (P, obs_dim)
+        actions_past = self.actions[idxs[start : start + P]].astype(np.int64)  # (P,)
+        return obs_past, actions_past
 
 
 # -----------------------------------------------------------------------------
@@ -407,10 +455,60 @@ def imagine_rollout(world_model, actor, start_obs, horizon=15):
     return zs, rewards, actions, observations
 
 
+def imagine_rollout_with_warmup(world_model, actor, obs_past, actions_past, future_horizon):
+    """Warm-up with real (obs, action) for P steps, then imagine F steps. Returns zs, rewards, actions, observations."""
+    world_model.eval()
+    actor.eval()
+    batch_size = obs_past.size(0)
+    action_dim = world_model.rssm.action_dim
+    latent_dim = world_model.rssm.latent_dim
+
+    with torch.no_grad():
+        h = world_model.rssm.init_hidden(batch_size, DEVICE)
+        z_prev = torch.zeros(batch_size, latent_dim, device=DEVICE)
+        a_prev = torch.zeros(batch_size, action_dim, device=DEVICE)
+
+        for t in range(obs_past.size(1)):
+            h = world_model.rssm.update_hidden(h, z_prev, a_prev)
+            mean_post, logstd_post = world_model.rssm.posterior(h, obs_past[:, t])
+            z_prev = world_model.rssm.sample_latent(mean_post, logstd_post)
+            a_prev = torch.nn.functional.one_hot(actions_past[:, t], num_classes=action_dim).float()
+
+        z = z_prev
+
+    zs = []
+    rewards = []
+    actions = []
+    observations = []
+
+    for t in range(future_horizon):
+        dist = actor(z)
+        a = dist.sample()
+        a_onehot = torch.nn.functional.one_hot(a, num_classes=action_dim).float()
+
+        h = world_model.rssm.update_hidden(h, z, a_onehot)
+        mean_prior, logstd_prior = world_model.rssm.prior(h)
+        z = world_model.rssm.sample_latent(mean_prior, logstd_prior)
+        r = world_model.predict_reward(h, z)
+        obs_imagined = world_model.reconstruct_obs(h, z)
+
+        zs.append(z)
+        rewards.append(r)
+        actions.append(a)
+        observations.append(obs_imagined)
+
+    zs = torch.stack(zs, dim=1)
+    rewards = torch.stack(rewards, dim=1)
+    actions = torch.stack(actions, dim=1)
+    observations = torch.stack(observations, dim=1)
+    return zs, rewards, actions, observations
+
+
 def train_actor_critic(world_model, actor, critic, dataloader,
                        epochs=10, lr=3e-4, gamma=0.99, lambda_gae=0.95,
-                       imagination_horizon=15, loss_weights=(1.0, 1.0), entropy_coeff=0.01,
-                       checkpoint_freq=100, aux_rewards_config=None, start_epoch=0, log_path=None):
+                       future_horizon=15, loss_weights=(1.0, 1.0), entropy_coeff=0.01,
+                       checkpoint_freq=100, aux_rewards_config=None, start_epoch=0, log_path=None,
+                       use_warmup=True, advantage_clip=3.0, actor_grad_clip=10.0):
     actor.train()
     critic.train()
     opt_actor = optim.AdamW(actor.parameters(), lr=lr)
@@ -431,12 +529,19 @@ def train_actor_critic(world_model, actor, critic, dataloader,
         num_batches = 0
 
         for batch in dataloader:
-            obs, actions, rewards, dones, next_obs = batch
-            obs = obs.to(DEVICE)
-
-            zs, imagined_rewards, imagined_actions, imagined_observations = imagine_rollout(
-                world_model, actor, obs, horizon=imagination_horizon
-            )
+            if use_warmup:
+                obs_past, actions_past = batch
+                obs_past = obs_past.to(DEVICE)
+                actions_past = actions_past.to(DEVICE)
+                zs, imagined_rewards, imagined_actions, imagined_observations = imagine_rollout_with_warmup(
+                    world_model, actor, obs_past, actions_past, future_horizon=future_horizon
+                )
+            else:
+                obs, actions, rewards, dones, next_obs = batch
+                obs = obs.to(DEVICE)
+                zs, imagined_rewards, imagined_actions, imagined_observations = imagine_rollout(
+                    world_model, actor, obs, horizon=future_horizon
+                )
 
             zs = zs.detach()
             imagined_rewards = imagined_rewards.detach()
@@ -457,7 +562,7 @@ def train_actor_critic(world_model, actor, critic, dataloader,
                 deltas = imagined_rewards + gamma * next_values - values
                 adv = torch.zeros_like(deltas)
                 gae = torch.zeros_like(deltas[:, 0])
-                for t in reversed(range(imagination_horizon)):
+                for t in reversed(range(future_horizon)):
                     gae = deltas[:, t] + gamma * lambda_gae * gae
                     adv[:, t] = gae
                 returns = adv + values
@@ -466,6 +571,7 @@ def train_actor_critic(world_model, actor, critic, dataloader,
             log_probs = dist.log_prob(imagined_actions.reshape(-1))
             adv_flat = adv.reshape(-1).detach()
             adv_flat = (adv_flat - adv_flat.mean()) / (adv_flat.std() + 1e-8)
+            adv_flat = torch.clamp(adv_flat, -advantage_clip, advantage_clip)
 
             actor_loss = loss_weights[0] * (-(log_probs * adv_flat).mean() - entropy_coeff * dist.entropy().mean())
 
@@ -475,7 +581,7 @@ def train_actor_critic(world_model, actor, critic, dataloader,
             opt_actor.zero_grad()
             actor_loss.backward()
             actor_grad_norm = torch.norm(torch.stack([torch.norm(p.grad) for p in actor.parameters() if p.grad is not None]))
-            torch.nn.utils.clip_grad_norm_(actor.parameters(), 100.0)
+            torch.nn.utils.clip_grad_norm_(actor.parameters(), actor_grad_clip)
             opt_actor.step()
 
             opt_critic.zero_grad()
@@ -608,27 +714,37 @@ def main():
     elif args.phase == 'actor_critic':
         log_path = os.path.join(".", "train_actorcritic_logs.txt")
 
-        dataset = TransitionDataset(args.train_dataset)
+        horizon = phase_config.get('horizon', 20)
+        past_horizon = phase_config.get('past_horizon', 5)
+        future_horizon = phase_config.get('future_horizon', 15)
+        assert past_horizon + future_horizon == horizon, (
+            f"past_horizon + future_horizon must equal horizon; got P={past_horizon} + F={future_horizon} != H={horizon}"
+        )
+
+        action_dim = phase_config.get('action_dim', 4)
+        dataset = ActorCriticWarmupDataset(
+            args.train_dataset, horizon, past_horizon, future_horizon, action_dim
+        )
+        if len(dataset) == 0:
+            raise ValueError(
+                f"No valid (episode, start) positions found. Episodes need at least {horizon} steps before done. "
+                f"Try a shorter horizon or a dataset with longer episodes."
+            )
         batch_size = phase_config.get('batch_size', 64)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True,
                                 generator=get_dataloader_generator(args.seed))
 
-        obs_dim = dataset.obs.shape[1]
-        action_dim = phase_config.get('action_dim', 4)
+        obs_dim = dataset.obs_dim
         capacity = phase_config.get('capacity', {})
         latent_dim = capacity.get('latent_dim', 64)
         hidden_dim = capacity.get('hidden_dim', 128)
 
         world_model = WorldModel(obs_dim, action_dim, latent_dim=latent_dim, hidden_dim=hidden_dim).to(DEVICE)
-        latest_wm = get_latest_checkpoint("world_model")
-        if latest_wm:
-            world_model.load_state_dict(torch.load(latest_wm, map_location=DEVICE))
-            log_message(f"Loaded world model: {latest_wm}", log_path)
-        elif os.path.exists("world_model.pt"):
+        if os.path.exists("world_model.pt"):
             world_model.load_state_dict(torch.load("world_model.pt", map_location=DEVICE))
             log_message("Loaded world model from world_model.pt", log_path)
         else:
-            raise FileNotFoundError("No world model checkpoint found.")
+            raise FileNotFoundError("world_model.pt not found. Train the world model first.")
         world_model.eval()
 
         actor = Actor(latent_dim=latent_dim, action_dim=action_dim, hidden_dim=hidden_dim).to(DEVICE)
@@ -658,7 +774,6 @@ def main():
 
         epochs = phase_config.get('epochs', 200)
         lr = phase_config.get('lr', 3e-4)
-        imagination_horizon = phase_config.get('imagination_horizon', 15)
         checkpoint_freq = phase_config.get('checkpoint_freq', 100)
 
         loss_weights = phase_config.get('loss_weights', {})
@@ -666,15 +781,21 @@ def main():
         critic_weight = loss_weights.get('critic', 0.25)
         entropy_coeff = loss_weights.get('entropy', 0.01)
         aux_rewards_config = phase_config.get('auxiliary_rewards', {})
+        lambda_gae = phase_config.get('lambda_gae', 0.95)
+        advantage_clip = phase_config.get('advantage_clip', 3.0)
+        actor_grad_clip = phase_config.get('actor_grad_clip', 10.0)
 
-        log_message(f"Training actor-critic for {epochs} epochs with lr={lr}, imagination_horizon={imagination_horizon}, seed={args.seed}...", log_path)
+        log_message(f"Training actor-critic for {epochs} epochs with lr={lr}, horizon={horizon} (P={past_horizon}, F={future_horizon}), lambda_gae={lambda_gae}, entropy={entropy_coeff}, adv_clip={advantage_clip}, seed={args.seed}...", log_path)
         log_message(f"Model capacity: latent_dim={latent_dim}, hidden_dim={hidden_dim}", log_path)
+        log_message(f"Dataset: {len(dataset)} valid (episode, start) positions", log_path)
 
         train_actor_critic(world_model, actor, critic, dataloader,
-                          epochs=epochs, lr=lr, imagination_horizon=imagination_horizon,
+                          epochs=epochs, lr=lr, future_horizon=future_horizon,
+                          lambda_gae=lambda_gae,
                           loss_weights=(actor_weight, critic_weight), entropy_coeff=entropy_coeff,
                           checkpoint_freq=checkpoint_freq, aux_rewards_config=aux_rewards_config,
-                          start_epoch=start_epoch, log_path=log_path)
+                          start_epoch=start_epoch, log_path=log_path, use_warmup=True,
+                          advantage_clip=advantage_clip, actor_grad_clip=actor_grad_clip)
 
         torch.save(actor.state_dict(), "actor.pt")
         torch.save(critic.state_dict(), "critic.pt")

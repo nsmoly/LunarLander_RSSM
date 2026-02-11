@@ -134,19 +134,30 @@ python train_models.py --phase actor_critic --config config.yaml \
 | `--config` | `config.yaml` | Path to config file |
 | `--train_dataset` | `lunarlander_train_dataset.npz` | Training dataset path |
 
-Config: `imagination_horizon`, `batch_size`, `lr`, `epochs`, `auxiliary_rewards`, etc.
+Config: `horizon`, `past_horizon`, `future_horizon` (must satisfy P+F=H), `batch_size`, `lr`, `epochs`, `auxiliary_rewards`, etc.
 
 ---
 
 ## 6. Test Actor-Critic (Policy)
 
-Run the trained policy in the LunarLander environment. Loads `world_model.pt` and `actor.pt`.
+Run the trained policy in the LunarLander environment. Loads world model and actor from config-matched checkpoints.
 
 ```bash
+# Default: world_model.pt (or world_model_good.pt), actor.pt
 python test_policy.py
+
+# Specify checkpoints
+python test_policy.py --world_model world_model_good.pt --actor actor.pt
+
+# Use config for model dimensions
+python test_policy.py --config config.yaml
 ```
 
-No arguments. Uses `world_model.pt` and `actor.pt` from the current directory.
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--config` | `config.yaml` | Config for latent_dim, hidden_dim, action_dim |
+| `--world_model` | `world_model.pt` | World model checkpoint (fallback: world_model_good.pt) |
+| `--actor` | `actor.pt` | Actor checkpoint |
 
 ---
 
