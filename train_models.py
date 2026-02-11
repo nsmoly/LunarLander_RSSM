@@ -1,6 +1,7 @@
 # train_models.py - World model and actor-critic training for LunarLander Dreamer
 import argparse
 import os
+import random
 import yaml
 import datetime
 import glob
@@ -14,6 +15,22 @@ from models import WorldModel, Actor, Critic
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 CHECKPOINT_DIR = "checkpoints"
+
+
+def set_seed(seed):
+    """Set seed for reproducibility."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
+def get_dataloader_generator(seed):
+    """Get a generator for DataLoader reproducibility."""
+    g = torch.Generator()
+    g.manual_seed(seed)
+    return g
 
 
 def log_message(message, log_path=None):
@@ -519,7 +536,11 @@ def main():
                         help='Path to training dataset')
     parser.add_argument('--val_dataset', type=str, default='lunarlander_val_dataset.npz',
                         help='Path to validation dataset (world model only)')
+    parser.add_argument('--seed', type=int, default=12345,
+                        help='Random seed for reproducibility')
     args = parser.parse_args()
+
+    set_seed(args.seed)
 
     with open(args.config, 'r') as f:
         config = yaml.safe_load(f)
@@ -535,7 +556,8 @@ def main():
         val_dataset = SequenceDataset(args.val_dataset, sequence_length, action_dim, random_start=False)
 
         batch_size = phase_config.get('batch_size', 64)
-        train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
+                                      generator=get_dataloader_generator(args.seed))
         val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
         obs_dim = train_dataset.obs_dim
@@ -570,7 +592,7 @@ def main():
         reward_weight = loss_weights.get('reward', 1.0)
         kl_weight = loss_weights.get('kl', 1.0)
 
-        log_message(f"Training world model for {epochs} epochs with lr={lr}, beta_kl={beta_kl}, sequence_length={sequence_length}...", log_path)
+        log_message(f"Training world model for {epochs} epochs with lr={lr}, beta_kl={beta_kl}, sequence_length={sequence_length}, seed={args.seed}...", log_path)
         log_message(f"Model capacity: latent_dim={latent_dim}, hidden_dim={hidden_dim}", log_path)
         log_message(f"Loss weights: recon={recon_weight}, reward={reward_weight}, kl={kl_weight}", log_path)
 
@@ -588,7 +610,8 @@ def main():
 
         dataset = TransitionDataset(args.train_dataset)
         batch_size = phase_config.get('batch_size', 64)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True,
+                                generator=get_dataloader_generator(args.seed))
 
         obs_dim = dataset.obs.shape[1]
         action_dim = phase_config.get('action_dim', 4)
@@ -644,7 +667,7 @@ def main():
         entropy_coeff = loss_weights.get('entropy', 0.01)
         aux_rewards_config = phase_config.get('auxiliary_rewards', {})
 
-        log_message(f"Training actor-critic for {epochs} epochs with lr={lr}, imagination_horizon={imagination_horizon}...", log_path)
+        log_message(f"Training actor-critic for {epochs} epochs with lr={lr}, imagination_horizon={imagination_horizon}, seed={args.seed}...", log_path)
         log_message(f"Model capacity: latent_dim={latent_dim}, hidden_dim={hidden_dim}", log_path)
 
         train_actor_critic(world_model, actor, critic, dataloader,

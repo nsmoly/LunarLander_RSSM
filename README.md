@@ -1,22 +1,6 @@
-# MoonLander RSSM Dreamer
+# MoonLander Policy Trained via RSSM World Model (aka DreamerV2-V3)
 
 Implementation of the latent world model similar to RSSM (DreamerV2-V3) for training the policy for LunarLander RL gym simulation by using model-based reinforcement learning that uses the pretrained latent world model for offline neural rollouts.
-
-## Sample Files (Checked In)
-
-The repository includes sample datasets and a trained world model checkpoint in the root folder:
-
-| File | Description |
-|------|--------------|
-| `lunarlander_train_dataset.npz` | Sample training dataset |
-| `lunarlander_val_dataset.npz` | Sample validation dataset |
-| `world_model_good.pt` | Pretrained world model checkpoint |
-
-Additional datasets in `datasets/`:
-- `lunarlander_train_dataset_500ep_02082026.npz` — 500 episodes
-- `lunarlander_val_dataset_100ep_02092026.npz` — 100 episodes
-
-Use `--checkpoint world_model_good.pt` when testing the world model.
 
 ## Workflow
 
@@ -90,6 +74,7 @@ python train_models.py --phase world_model --config config.yaml \
 | `--config` | `config.yaml` | Path to config file |
 | `--train_dataset` | `lunarlander_train_dataset.npz` | Training dataset path |
 | `--val_dataset` | `lunarlander_val_dataset.npz` | Validation dataset path |
+| `--seed` | 12345 | Random seed for reproducibility |
 
 Config is in `config.yaml`: `sequence_length`, `batch_size`, `lr`, `epochs`, etc.
 
@@ -164,6 +149,19 @@ python test_policy.py
 No arguments. Uses `world_model.pt` and `actor.pt` from the current directory.
 
 ---
+
+## Sample Files (Checked In)
+
+The repository includes sample datasets and a trained world model checkpoint in the root folder:
+
+| File | Description |
+|------|--------------|
+| `lunarlander_train_dataset.npz` | Sample training dataset |
+| `lunarlander_val_dataset.npz` | Sample validation dataset |
+| `world_model_good.pt` | Pretrained world model checkpoint |
+
+Use `--checkpoint world_model_good.pt` when testing the world model.
+
 
 ## Quick Reference
 

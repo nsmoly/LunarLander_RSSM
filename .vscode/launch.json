@@ -37,6 +37,7 @@
                 "--config", "config.yaml",
                 "--train_dataset", "lunarlander_train_dataset.npz",
                 "--val_dataset", "lunarlander_val_dataset.npz",
+                "--seed", "12345"
             ],
             "console": "integratedTerminal",
             "justMyCode": false
@@ -67,7 +68,8 @@
             "program": "${workspaceFolder}/train_models.py",
             "args": [
                 "--phase", "actor_critic",
-                "--config", "config.yaml"
+                "--config", "config.yaml",
+                "--seed", "12345"
             ],
             "console": "integratedTerminal",
             "justMyCode": false
