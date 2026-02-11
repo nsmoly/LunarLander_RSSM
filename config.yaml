@@ -1,5 +1,6 @@
 # Configuration file for Dreamer training parameters
 world_model:
+  action_dim: 4
   capacity:
     latent_dim: 64
     hidden_dim: 128
@@ -12,16 +13,18 @@ world_model:
   lr: 0.0001
   beta_kl: 0.5
   batch_size: 64
+  sequence_length: 50
   checkpoint_freq: 10  # Save checkpoint every 100 epochs
   
 actor_critic:
+  action_dim: 4
   capacity:
     latent_dim: 64
     hidden_dim: 128
   loss_weights:
     actor: 1.0
-    critic: 0.5
-    entropy: 0.03
+    critic: 0.25
+    entropy: 0.07
   auxiliary_rewards:
     upright_pose_weight: 0.0 # 0.01    # Reward for being upright (angle close to 0)
     downward_speed_weight: 0.0 # 0.005 # Penalty for downward velocity

@@ -40,9 +40,14 @@ def main():
     total_reward = 0.0
 
     with torch.no_grad():
+        action_dim = world_model.rssm.action_dim
         h = world_model.rssm.init_hidden(1, DEVICE)
+        z_prev = torch.zeros(1, world_model.rssm.latent_dim, device=DEVICE)
+        a_prev = torch.zeros(1, action_dim, device=DEVICE)
+        h = world_model.rssm.update_hidden(h, z_prev, a_prev)
         obs_t = torch.tensor(obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
-        z, _, _, h = world_model.rssm.posterior(obs_t, h)
+        mean_post, logstd_post = world_model.rssm.posterior(h, obs_t)
+        z = world_model.rssm.sample_latent(mean_post, logstd_post)
 
         while True:
             dist = actor(z)
@@ -53,8 +58,13 @@ def main():
             done = terminated or truncated
             total_reward += reward
 
+            a_onehot = torch.nn.functional.one_hot(
+                torch.tensor([action], device=DEVICE), num_classes=action_dim
+            ).float()
+            h = world_model.rssm.update_hidden(h, z, a_onehot)
             obs_t = torch.tensor(next_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
-            z, _, _, h = world_model.rssm.posterior(obs_t, h)
+            mean_post, logstd_post = world_model.rssm.posterior(h, obs_t)
+            z = world_model.rssm.sample_latent(mean_post, logstd_post)
 
             env.render()
             if done:
@@ -63,7 +73,11 @@ def main():
                 obs, _ = env.reset()
                 obs_t = torch.tensor(obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
                 h = world_model.rssm.init_hidden(1, DEVICE)
-                z, _, _, h = world_model.rssm.posterior(obs_t, h)
+                z_prev = torch.zeros(1, world_model.rssm.latent_dim, device=DEVICE)
+                a_prev = torch.zeros(1, action_dim, device=DEVICE)
+                h = world_model.rssm.update_hidden(h, z_prev, a_prev)
+                mean_post, logstd_post = world_model.rssm.posterior(h, obs_t)
+                z = world_model.rssm.sample_latent(mean_post, logstd_post)
 
 if __name__ == "__main__":
     main()

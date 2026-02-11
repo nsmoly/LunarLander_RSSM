@@ -2,11 +2,61 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Collect Data",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/collect_dataset.py",
+            "args": [
+                "--dataset", "lunarlander_dataset.npz",
+                "--seed", "12345"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Replay dataset",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/replay_dataset.py",
+            "args": [
+                "--dataset", "lunarlander_dataset.npz",
+                "--episodes", "200",
+                "--seed", "12345",
+                "--sleep", "0.02"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
             "name": "Train World Model",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/train_offline_dreamer.py",
-            "args": ["--phase", "world_model"],
+            "program": "${workspaceFolder}/train_models.py",
+            "args": [
+                "--phase", "world_model",
+                "--config", "config.yaml",
+                "--train_dataset", "lunarlander_train_dataset.npz",
+                "--val_dataset", "lunarlander_val_dataset.npz",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Test World Model",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/test_worldmodel.py",
+            "args": [
+                "--dataset", "lunarlander_val_dataset.npz",
+                "--config", "config.yaml",
+                "--checkpoint", "world_model.pt",
+                "--mode", "open",
+                "--max_episodes", "20",
+                "--seed", "12345",
+                "--plot_dir", "plots",
+                "--animate",
+                "--constant_action", "0"
+            ],
             "console": "integratedTerminal",
             "justMyCode": false
         },
@@ -14,8 +64,11 @@
             "name": "Train Actor-Critic",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/train_offline_dreamer.py",
-            "args": ["--phase", "actor_critic"],
+            "program": "${workspaceFolder}/train_models.py",
+            "args": [
+                "--phase", "actor_critic",
+                "--config", "config.yaml"
+            ],
             "console": "integratedTerminal",
             "justMyCode": false
         },
@@ -24,14 +77,6 @@
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/test_policy.py",
-            "console": "integratedTerminal",
-            "justMyCode": false
-        },
-        {
-            "name": "Collect Data",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/collect_lunarlander_data.py",
             "console": "integratedTerminal",
             "justMyCode": false
         }

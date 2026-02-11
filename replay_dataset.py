@@ -4,21 +4,9 @@ import numpy as np
 import gym
 
 
-def split_episodes(actions, dones):
-    end_idxs = np.where(dones == 1)[0]
-    episodes = []
-    start = 0
-    for end in end_idxs:
-        episodes.append((start, end + 1))
-        start = end + 1
-    if start < len(actions):
-        episodes.append((start, len(actions)))
-    return episodes
-
-
 def main():
     parser = argparse.ArgumentParser(description="Replay dataset episodes in LunarLander")
-    parser.add_argument("--dataset", default="lunarlander_train_dataset.npz",
+    parser.add_argument("--dataset", default="lunarlander_dataset.npz",
                         help="Path to dataset .npz")
     parser.add_argument("--episodes", type=int, default=20,
                         help="Number of episodes to replay")
@@ -29,24 +17,32 @@ def main():
     args = parser.parse_args()
 
     data = np.load(args.dataset)
-    actions = data["actions"].astype(np.int64)
-    dones = data["dones"].astype(np.int64)
+    ep_index = data["ep_index"].astype(np.int64)
+    step_index = data["step_index"].astype(np.int64)
+    actions = data["actions"]
+    episode_seed = data["episode_seed"].astype(np.int64) if "episode_seed" in data else None
 
-    episodes = split_episodes(actions, dones)
-    if not episodes:
+    if ep_index.size == 0:
         print("No episodes found in dataset.")
         return
 
     rng = np.random.default_rng(args.seed)
-    num = min(args.episodes, len(episodes))
-    picks = rng.choice(len(episodes), size=num, replace=False)
+    episode_ids = np.unique(ep_index)
+    num = min(args.episodes, len(episode_ids))
+    picks = rng.choice(len(episode_ids), size=num, replace=False)
 
     env = gym.make("LunarLander-v2", render_mode="human")
 
     for i, ep_idx in enumerate(picks, start=1):
-        start, end = episodes[ep_idx]
-        ep_actions = actions[start:end]
-        obs, _ = env.reset(seed=args.seed + i)
+        ep_id = episode_ids[ep_idx]
+        mask = ep_index == ep_id
+        order = np.argsort(step_index[mask], kind="stable")
+        ep_actions = actions[mask][order]
+        if episode_seed is not None:
+            ep_seed = int(episode_seed[mask][0])
+            obs, _ = env.reset(seed=ep_seed)
+        else:
+            obs, _ = env.reset(seed=args.seed + i)
         total_reward = 0.0
 
         for a in ep_actions:
@@ -56,7 +52,7 @@ def main():
             if terminated or truncated:
                 break
 
-        print(f"Episode {i}/{num} (dataset idx {ep_idx}) length={len(ep_actions)} reward={total_reward:.2f}")
+        print(f"Episode {i}/{num} (dataset ep {int(ep_id)}) length={len(ep_actions)} reward={total_reward:.2f}")
 
     env.close()
 
