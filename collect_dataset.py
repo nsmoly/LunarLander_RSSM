@@ -1,6 +1,6 @@
 # collect_dataset.py
 import argparse
-import gym
+import gymnasium as gym
 import numpy as np
 import pygame
 from pygame.locals import K_LEFT, K_RIGHT, K_UP, K_DOWN, K_ESCAPE, QUIT, KEYDOWN
@@ -25,7 +25,7 @@ def main():
     args = parser.parse_args()
 
     rng = np.random.default_rng(args.seed)
-    env = gym.make("LunarLander-v2", render_mode="human")
+    env = gym.make("LunarLander-v3", render_mode="human")
     env.unwrapped.SCALE = 20  # Zoom out by reducing scale (default 30)
     episode_seed = int(rng.integers(0, 2**31 - 1))
     obs, _ = env.reset(seed=episode_seed)

@@ -1,7 +1,7 @@
 # test_policy.py
 import argparse
 import os
-import gym
+import gymnasium as gym
 import torch
 import numpy as np
 import yaml
@@ -35,7 +35,7 @@ def main():
 
     latent_dim, hidden_dim, action_dim = load_config(args.config)
 
-    env = gym.make("LunarLander-v2", render_mode="human")
+    env = gym.make("LunarLander-v3", render_mode="human")
     obs, _ = env.reset()
 
     obs_dim = env.observation_space.shape[0]

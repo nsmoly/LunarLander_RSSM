@@ -1,7 +1,7 @@
 import argparse
 import time
 import numpy as np
-import gym
+import gymnasium as gym
 
 
 def main():
@@ -31,7 +31,7 @@ def main():
     num = min(args.episodes, len(episode_ids))
     picks = rng.choice(len(episode_ids), size=num, replace=False)
 
-    env = gym.make("LunarLander-v2", render_mode="human")
+    env = gym.make("LunarLander-v3", render_mode="human")
 
     for i, ep_idx in enumerate(picks, start=1):
         ep_id = episode_ids[ep_idx]
