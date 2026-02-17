@@ -163,15 +163,17 @@ python test_policy.py --config config.yaml
 
 ## Sample Files (Checked In)
 
-The repository includes sample datasets and a trained world model checkpoint in the root folder:
+The repository includes sample datasets and a trained world model and actor-critic checkpoints in the root folder:
 
 | File | Description |
 |------|--------------|
 | `lunarlander_train_dataset.npz` | Sample training dataset |
 | `lunarlander_val_dataset.npz` | Sample validation dataset |
-| `world_model_good.pt` | Pretrained world model checkpoint |
+| `world_model.pt` | Pretrained world model checkpoint (140 epoch) |
+| `actor.pt` | Pretrained world model checkpoint (130 epoch) |
+| `critic.pt` | Pretrained world model checkpoint (130 epoch) |
 
-Use `--checkpoint world_model_good.pt` when testing the world model.
+Use `--checkpoint world_model.pt` when testing the world model.
 
 
 ## Quick Reference

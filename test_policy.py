@@ -3,7 +3,6 @@ import argparse
 import os
 import gymnasium as gym
 import torch
-import numpy as np
 import yaml
 
 from models import WorldModel, Actor
@@ -13,15 +12,16 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def load_config(config_path):
     if not os.path.exists(config_path):
-        return 64, 128, 4
+        return 64, 128, 1, 4
     with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f) or {}
     wm = config.get("world_model", {})
     cap = wm.get("capacity", {})
     latent_dim = int(cap.get("latent_dim", 64))
     hidden_dim = int(cap.get("hidden_dim", 128))
+    gru_num_layers = int(cap.get("gru_num_layers", 1))
     action_dim = int(wm.get("action_dim", 4))
-    return latent_dim, hidden_dim, action_dim
+    return latent_dim, hidden_dim, gru_num_layers, action_dim
 
 
 def main():
@@ -31,16 +31,36 @@ def main():
                         help="World model checkpoint (default: world_model.pt)")
     parser.add_argument("--actor", default=None,
                         help="Actor checkpoint (default: actor.pt)")
+    action_mode = parser.add_mutually_exclusive_group()
+    action_mode.add_argument(
+        "--deterministic",
+        dest="deterministic",
+        action="store_true",
+        help="Use argmax action selection (default).",
+    )
+    action_mode.add_argument(
+        "--stochastic",
+        dest="deterministic",
+        action="store_false",
+        help="Sample actions from the policy distribution.",
+    )
+    parser.set_defaults(deterministic=True)
     args = parser.parse_args()
 
-    latent_dim, hidden_dim, action_dim = load_config(args.config)
+    latent_dim, hidden_dim, gru_num_layers, action_dim = load_config(args.config)
 
     env = gym.make("LunarLander-v3", render_mode="human")
     obs, _ = env.reset()
 
     obs_dim = env.observation_space.shape[0]
 
-    world_model = WorldModel(obs_dim, action_dim, latent_dim=latent_dim, hidden_dim=hidden_dim).to(DEVICE)
+    world_model = WorldModel(
+        obs_dim,
+        action_dim,
+        latent_dim=latent_dim,
+        hidden_dim=hidden_dim,
+        gru_num_layers=gru_num_layers,
+    ).to(DEVICE)
     actor = Actor(latent_dim=latent_dim, action_dim=action_dim, hidden_dim=hidden_dim).to(DEVICE)
 
     wm_path = args.world_model or "world_model.pt"
@@ -61,6 +81,9 @@ def main():
 
     world_model.eval()
     actor.eval()
+    print(
+        f"Action selection mode: {'deterministic (argmax)' if args.deterministic else 'stochastic (sample)'}"
+    )
 
     done = False
     total_reward = 0.0
@@ -77,7 +100,10 @@ def main():
 
         while True:
             dist = actor(z)
-            action = dist.sample().item()
+            if args.deterministic:
+                action = torch.argmax(dist.probs, dim=-1).item()
+            else:
+                action = dist.sample().item()
             print(f"Action: {action}, Probs: {dist.probs.cpu().numpy().flatten()}")
 
             next_obs, reward, terminated, truncated, info = env.step(action)

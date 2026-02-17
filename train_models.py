@@ -7,7 +7,7 @@ import datetime
 import glob
 import numpy as np
 import torch
-import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 
@@ -219,7 +219,7 @@ def kl_divergence(mean_q, logstd_q, mean_p, logstd_p):
     ).sum(-1)
 
 
-def validate_world_model(world_model, val_dataloader, beta_kl=1.0, loss_weights=(1.0, 1.0, 1.0)):
+def validate_world_model(world_model, val_dataloader, beta_kl=1.0, loss_weights=(1.0, 1.0, 1.0, 0.5)):
     world_model.eval()
     obs_dim = world_model.rssm.obs_dim
 
@@ -229,6 +229,7 @@ def validate_world_model(world_model, val_dataloader, beta_kl=1.0, loss_weights=
     total_reward_abs = 0.0
     total_reward_sq = 0.0
     total_reward_sign_correct = 0.0
+    total_done_correct = 0.0
     total_mask = 0.0
 
     with torch.no_grad():
@@ -237,6 +238,7 @@ def validate_world_model(world_model, val_dataloader, beta_kl=1.0, loss_weights=
             obs_seq = obs_seq.to(DEVICE)
             actions_seq = actions_seq.to(DEVICE)
             rewards_seq = rewards_seq.to(DEVICE)
+            dones_seq = dones_seq.to(DEVICE).float()
             mask = mask.to(DEVICE)
 
             batch_size, seq_len = obs_seq.shape[:2]
@@ -250,6 +252,7 @@ def validate_world_model(world_model, val_dataloader, beta_kl=1.0, loss_weights=
             sum_recon = 0.0
             sum_rew = 0.0
             sum_kl = 0.0
+            sum_done = 0.0
 
             for t in range(seq_len):
                 h = world_model.rssm.update_hidden(h, z_prev, a_prev)
@@ -259,14 +262,17 @@ def validate_world_model(world_model, val_dataloader, beta_kl=1.0, loss_weights=
 
                 obs_pred = world_model.reconstruct_obs(h, z_t)
                 reward_pred = world_model.predict_reward(h, z_t)
+                done_logits = world_model.predict_done_logits(h, z_t)
 
                 recon_loss = (obs_pred - obs_seq[:, t]).pow(2).sum(-1)
                 reward_loss = (reward_pred - rewards_seq[:, t]).pow(2)
+                done_loss = F.binary_cross_entropy_with_logits(done_logits, dones_seq[:, t], reduction="none")
                 kl = kl_divergence(mean_post, logstd_post, mean_prior, logstd_prior)
 
                 mask_t = mask[:, t]
                 sum_recon += (recon_loss * mask_t).sum()
                 sum_rew += (reward_loss * mask_t).sum()
+                sum_done += (done_loss * mask_t).sum()
                 sum_kl += (kl * mask_t).sum()
 
                 obs_diff = (obs_pred - obs_seq[:, t]).abs().sum(-1)
@@ -278,6 +284,8 @@ def validate_world_model(world_model, val_dataloader, beta_kl=1.0, loss_weights=
                 true_reward_sign = (rewards_seq[:, t] > 0).float()
                 pred_reward_sign = (reward_pred > 0).float()
                 total_reward_sign_correct += ((true_reward_sign == pred_reward_sign).float() * mask_t).sum().item()
+                done_pred = (torch.sigmoid(done_logits) >= 0.5).float()
+                total_done_correct += ((done_pred == dones_seq[:, t]).float() * mask_t).sum().item()
 
                 total_mask += mask_t.sum().item()
 
@@ -289,6 +297,7 @@ def validate_world_model(world_model, val_dataloader, beta_kl=1.0, loss_weights=
                 total_loss += (
                     loss_weights[0] * sum_recon
                     + loss_weights[1] * sum_rew
+                    + loss_weights[3] * sum_done
                     + loss_weights[2] * beta_kl * sum_kl
                 ).item()
 
@@ -299,7 +308,8 @@ def validate_world_model(world_model, val_dataloader, beta_kl=1.0, loss_weights=
             'obs_rmse': 0.0,
             'reward_mae': 0.0,
             'reward_rmse': 0.0,
-            'reward_sign_acc': 0.0
+            'reward_sign_acc': 0.0,
+            'done_acc': 0.0,
         }
 
     obs_count = total_mask * obs_dim
@@ -309,6 +319,7 @@ def validate_world_model(world_model, val_dataloader, beta_kl=1.0, loss_weights=
     avg_reward_mae = total_reward_abs / total_mask
     avg_reward_rmse = np.sqrt(total_reward_sq / total_mask)
     avg_reward_sign_acc = total_reward_sign_correct / total_mask
+    avg_done_acc = total_done_correct / total_mask
 
     return {
         'loss': avg_loss,
@@ -316,12 +327,13 @@ def validate_world_model(world_model, val_dataloader, beta_kl=1.0, loss_weights=
         'obs_rmse': avg_obs_rmse,
         'reward_mae': avg_reward_mae,
         'reward_rmse': avg_reward_rmse,
-        'reward_sign_acc': avg_reward_sign_acc
+        'reward_sign_acc': avg_reward_sign_acc,
+        'done_acc': avg_done_acc,
     }
 
 
 def train_world_model(world_model, train_dataloader, val_dataloader, epochs=10, start_epoch=0,
-                     checkpoint_freq=100, val_freq=10, lr=3e-4, beta_kl=1.0, loss_weights=(1.0, 1.0, 1.0),
+                     checkpoint_freq=100, val_freq=10, lr=3e-4, beta_kl=1.0, loss_weights=(1.0, 1.0, 1.0, 0.5),
                      log_path=None):
     world_model.train()
     opt = optim.AdamW(world_model.parameters(), lr=lr)
@@ -337,6 +349,7 @@ def train_world_model(world_model, train_dataloader, val_dataloader, epochs=10, 
             obs_seq = obs_seq.to(DEVICE)
             actions_seq = actions_seq.to(DEVICE)
             rewards_seq = rewards_seq.to(DEVICE)
+            dones_seq = dones_seq.to(DEVICE).float()
             mask = mask.to(DEVICE)
 
             batch_size, seq_len = obs_seq.shape[:2]
@@ -350,6 +363,7 @@ def train_world_model(world_model, train_dataloader, val_dataloader, epochs=10, 
             sum_recon = 0.0
             sum_rew = 0.0
             sum_kl = 0.0
+            sum_done = 0.0
             total_mask = mask.sum().clamp_min(1.0)
 
             for t in range(seq_len):
@@ -360,14 +374,17 @@ def train_world_model(world_model, train_dataloader, val_dataloader, epochs=10, 
 
                 obs_pred = world_model.reconstruct_obs(h, z_t)
                 reward_pred = world_model.predict_reward(h, z_t)
+                done_logits = world_model.predict_done_logits(h, z_t)
 
                 recon_loss = (obs_pred - obs_seq[:, t]).pow(2).sum(-1)
                 reward_loss = (reward_pred - rewards_seq[:, t]).pow(2)
+                done_loss = F.binary_cross_entropy_with_logits(done_logits, dones_seq[:, t], reduction="none")
                 kl = kl_divergence(mean_post, logstd_post, mean_prior, logstd_prior)
 
                 mask_t = mask[:, t]
                 sum_recon += (recon_loss * mask_t).sum()
                 sum_rew += (reward_loss * mask_t).sum()
+                sum_done += (done_loss * mask_t).sum()
                 sum_kl += (kl * mask_t).sum()
 
                 z_prev = z_t
@@ -376,6 +393,7 @@ def train_world_model(world_model, train_dataloader, val_dataloader, epochs=10, 
             loss = (
                 loss_weights[0] * sum_recon
                 + loss_weights[1] * sum_rew
+                + loss_weights[3] * sum_done
                 + loss_weights[2] * beta_kl * sum_kl
             ) / total_mask
 
@@ -393,6 +411,7 @@ def train_world_model(world_model, train_dataloader, val_dataloader, epochs=10, 
             log_message(f"[WorldModel] Epoch {epoch}, train_loss={train_loss:.4f}, val_loss={val_metrics['loss']:.4f}", log_path)
             log_message(f"  Validation Metrics - Obs MAE: {val_metrics['obs_mae']:.4f}, Obs RMSE: {val_metrics['obs_rmse']:.4f}", log_path)
             log_message(f"  Reward MAE: {val_metrics['reward_mae']:.4f}, Reward RMSE: {val_metrics['reward_rmse']:.4f}, Reward Sign Acc: {val_metrics['reward_sign_acc']:.3f}", log_path)
+            log_message(f"  Done Acc: {val_metrics['done_acc']:.3f}", log_path)
         else:
             log_message(f"[WorldModel] Epoch {epoch}, train_loss={train_loss:.4f}", log_path)
 
@@ -507,8 +526,13 @@ def imagine_rollout_with_warmup(world_model, actor, obs_past, actions_past, futu
 def train_actor_critic(world_model, actor, critic, dataloader,
                        epochs=10, lr=3e-4, gamma=0.99, lambda_gae=0.95,
                        future_horizon=15, loss_weights=(1.0, 1.0), entropy_coeff=0.01,
+                       entropy_coeff_end=None,
                        checkpoint_freq=100, aux_rewards_config=None, start_epoch=0, log_path=None,
-                       use_warmup=True, advantage_clip=3.0, actor_grad_clip=10.0):
+                       use_warmup=True, advantage_clip=3.0, actor_grad_clip=10.0,
+                       collapse_entropy_threshold=0.2, collapse_actor_grad_threshold=1e-3,
+                       collapse_max_action_prob_threshold=0.98, collapse_patience_epochs=3,
+                       low_entropy_actor_lr_threshold=0.9,
+                       reduced_actor_lr=None):
     actor.train()
     critic.train()
     opt_actor = optim.AdamW(actor.parameters(), lr=lr)
@@ -516,12 +540,34 @@ def train_actor_critic(world_model, actor, critic, dataloader,
 
     aux_rewards_config = aux_rewards_config or {}
 
+    if entropy_coeff_end is None:
+        entropy_coeff_end = entropy_coeff
+
+    def _grad_norm(parameters):
+        grads = [p.grad for p in parameters if p.grad is not None]
+        if not grads:
+            return torch.tensor(0.0, device=DEVICE)
+        return torch.norm(torch.stack([torch.norm(g) for g in grads]))
+
+    low_entropy_streak = 0
+    low_actor_grad_streak = 0
+    high_action_conf_streak = 0
+    actor_lr_reduced = False
+
     for epoch in range(start_epoch + 1, epochs + 1):
+        # Linear entropy decay across the configured actor-critic epochs.
+        if epochs <= 1:
+            current_entropy_coeff = entropy_coeff_end
+        else:
+            progress = (epoch - 1) / float(epochs - 1)
+            current_entropy_coeff = entropy_coeff + (entropy_coeff_end - entropy_coeff) * progress
+
         total_actor_loss = 0.0
         total_critic_loss = 0.0
         total_imagined_reward = 0.0
         total_value_mae = 0.0
         total_entropy = 0.0
+        total_max_action_prob = 0.0
         total_actor_grad_norm = 0.0
         total_critic_grad_norm = 0.0
         total_aux_upright = 0.0
@@ -573,26 +619,29 @@ def train_actor_critic(world_model, actor, critic, dataloader,
             adv_flat = (adv_flat - adv_flat.mean()) / (adv_flat.std() + 1e-8)
             adv_flat = torch.clamp(adv_flat, -advantage_clip, advantage_clip)
 
-            actor_loss = loss_weights[0] * (-(log_probs * adv_flat).mean() - entropy_coeff * dist.entropy().mean())
+            actor_loss = loss_weights[0] * (
+                -(log_probs * adv_flat).mean() - current_entropy_coeff * dist.entropy().mean()
+            )
 
             value_pred = critic(zs.reshape(-1, zs.size(-1)))
             critic_loss = loss_weights[1] * (value_pred - returns.reshape(-1).detach()).pow(2).mean()
 
             opt_actor.zero_grad()
             actor_loss.backward()
-            actor_grad_norm = torch.norm(torch.stack([torch.norm(p.grad) for p in actor.parameters() if p.grad is not None]))
+            actor_grad_norm = _grad_norm(actor.parameters())
             torch.nn.utils.clip_grad_norm_(actor.parameters(), actor_grad_clip)
             opt_actor.step()
 
             opt_critic.zero_grad()
             critic_loss.backward()
-            critic_grad_norm = torch.norm(torch.stack([torch.norm(p.grad) for p in critic.parameters() if p.grad is not None]))
+            critic_grad_norm = _grad_norm(critic.parameters())
             torch.nn.utils.clip_grad_norm_(critic.parameters(), 100.0)
             opt_critic.step()
 
             imagined_reward_mean = imagined_rewards.mean().item()
             value_mae = torch.abs(value_pred - returns.reshape(-1).detach()).mean().item()
             entropy = dist.entropy().mean().item()
+            max_action_prob = dist.probs.max(dim=-1).values.mean().item()
             angles = imagined_observations[..., 4]
             y_velocities = imagined_observations[..., 3]
             upright_reward = aux_rewards_config.get('upright_pose_weight', 0.1) * torch.exp(-torch.abs(angles)).mean().item()
@@ -603,6 +652,7 @@ def train_actor_critic(world_model, actor, critic, dataloader,
             total_imagined_reward += imagined_reward_mean
             total_value_mae += value_mae
             total_entropy += entropy
+            total_max_action_prob += max_action_prob
             total_actor_grad_norm += actor_grad_norm.item()
             total_critic_grad_norm += critic_grad_norm.item()
             total_aux_upright += upright_reward
@@ -614,15 +664,73 @@ def train_actor_critic(world_model, actor, critic, dataloader,
         avg_imagined_reward = total_imagined_reward / num_batches
         avg_value_mae = total_value_mae / num_batches
         avg_entropy = total_entropy / num_batches
+        avg_max_action_prob = total_max_action_prob / num_batches
         avg_actor_grad_norm = total_actor_grad_norm / num_batches
         avg_critic_grad_norm = total_critic_grad_norm / num_batches
         avg_aux_upright = total_aux_upright / num_batches
         avg_aux_downward = total_aux_downward / num_batches
 
         log_message(f"[ActorCritic] Epoch {epoch}, actor_loss={avg_actor_loss:.4f}, critic_loss={avg_critic_loss:.4f}", log_path)
-        log_message(f"  Metrics - Imagined Reward: {avg_imagined_reward:.4f}, Value MAE: {avg_value_mae:.4f}, Entropy: {avg_entropy:.4f}", log_path)
+        log_message(
+            f"  Metrics - Imagined Reward: {avg_imagined_reward:.4f}, Value MAE: {avg_value_mae:.4f}, "
+            f"Entropy: {avg_entropy:.4f}, Max Action Prob: {avg_max_action_prob:.4f}, "
+            f"Entropy Coef: {current_entropy_coeff:.4f}",
+            log_path,
+        )
         log_message(f"  Grad Norms - Actor: {avg_actor_grad_norm:.4f}, Critic: {avg_critic_grad_norm:.4f}", log_path)
         log_message(f"  Aux Rewards - Upright: {avg_aux_upright:.4f}, Downward Penalty: {avg_aux_downward:.4f}", log_path)
+
+        # One-way actor LR reduction when policy entropy gets too low.
+        if (
+            reduced_actor_lr is not None
+            and not actor_lr_reduced
+            and avg_entropy < low_entropy_actor_lr_threshold
+            and reduced_actor_lr < opt_actor.param_groups[0]["lr"]
+        ):
+            old_lr = opt_actor.param_groups[0]["lr"]
+            for pg in opt_actor.param_groups:
+                pg["lr"] = reduced_actor_lr
+            actor_lr_reduced = True
+            log_message(
+                f"  [LR Guard] Reduced actor LR from {old_lr:.2e} to {reduced_actor_lr:.2e} "
+                f"(entropy={avg_entropy:.4f} < {low_entropy_actor_lr_threshold:.4f})",
+                log_path,
+            )
+
+        # Early-stop guard against policy collapse.
+        low_entropy_streak = low_entropy_streak + 1 if avg_entropy < collapse_entropy_threshold else 0
+        low_actor_grad_streak = (
+            low_actor_grad_streak + 1 if avg_actor_grad_norm < collapse_actor_grad_threshold else 0
+        )
+        high_action_conf_streak = (
+            high_action_conf_streak + 1
+            if avg_max_action_prob > collapse_max_action_prob_threshold
+            else 0
+        )
+        if (
+            low_entropy_streak >= collapse_patience_epochs
+            or low_actor_grad_streak >= collapse_patience_epochs
+            or high_action_conf_streak >= collapse_patience_epochs
+        ):
+            reason = (
+                f"entropy<{collapse_entropy_threshold:.4f} for {low_entropy_streak} epochs"
+                if low_entropy_streak >= collapse_patience_epochs
+                else (
+                    f"actor_grad<{collapse_actor_grad_threshold:.4f} for {low_actor_grad_streak} epochs"
+                    if low_actor_grad_streak >= collapse_patience_epochs
+                    else (
+                        f"max_action_prob>{collapse_max_action_prob_threshold:.4f} "
+                        f"for {high_action_conf_streak} epochs"
+                    )
+                )
+            )
+            log_message(
+                f"[ActorCritic] Early stopping at epoch {epoch} due to collapse guard ({reason}).",
+                log_path,
+            )
+            save_checkpoint_with_timestamp(actor, "actor", epoch, log_path=log_path)
+            save_checkpoint_with_timestamp(critic, "critic", epoch, log_path=log_path)
+            break
 
         if epoch % checkpoint_freq == 0:
             save_checkpoint_with_timestamp(actor, "actor", epoch, log_path=log_path)
@@ -670,8 +778,15 @@ def main():
         capacity = phase_config.get('capacity', {})
         latent_dim = capacity.get('latent_dim', 64)
         hidden_dim = capacity.get('hidden_dim', 128)
+        gru_num_layers = int(capacity.get('gru_num_layers', 1))
 
-        world_model = WorldModel(obs_dim, action_dim, latent_dim=latent_dim, hidden_dim=hidden_dim).to(DEVICE)
+        world_model = WorldModel(
+            obs_dim,
+            action_dim,
+            latent_dim=latent_dim,
+            hidden_dim=hidden_dim,
+            gru_num_layers=gru_num_layers,
+        ).to(DEVICE)
 
         latest_checkpoint = get_latest_checkpoint("world_model")
         start_epoch = 0
@@ -697,15 +812,23 @@ def main():
         recon_weight = loss_weights.get('reconstruction', 1.0)
         reward_weight = loss_weights.get('reward', 1.0)
         kl_weight = loss_weights.get('kl', 1.0)
+        done_weight = loss_weights.get('done', 0.5)
 
         log_message(f"Training world model for {epochs} epochs with lr={lr}, beta_kl={beta_kl}, sequence_length={sequence_length}, seed={args.seed}...", log_path)
-        log_message(f"Model capacity: latent_dim={latent_dim}, hidden_dim={hidden_dim}", log_path)
-        log_message(f"Loss weights: recon={recon_weight}, reward={reward_weight}, kl={kl_weight}", log_path)
+        log_message(
+            f"Model capacity: latent_dim={latent_dim}, hidden_dim={hidden_dim}, "
+            f"gru_num_layers={gru_num_layers}",
+            log_path,
+        )
+        log_message(
+            f"Loss weights: recon={recon_weight}, reward={reward_weight}, kl={kl_weight}, done={done_weight}",
+            log_path,
+        )
 
         train_world_model(world_model, train_dataloader, val_dataloader,
                          epochs=epochs, start_epoch=start_epoch, checkpoint_freq=checkpoint_freq,
                          val_freq=val_freq, lr=lr, beta_kl=beta_kl,
-                         loss_weights=(recon_weight, reward_weight, kl_weight),
+                         loss_weights=(recon_weight, reward_weight, kl_weight, done_weight),
                          log_path=log_path)
 
         torch.save(world_model.state_dict(), "world_model.pt")
@@ -738,8 +861,15 @@ def main():
         capacity = phase_config.get('capacity', {})
         latent_dim = capacity.get('latent_dim', 64)
         hidden_dim = capacity.get('hidden_dim', 128)
+        gru_num_layers = int(capacity.get('gru_num_layers', 1))
 
-        world_model = WorldModel(obs_dim, action_dim, latent_dim=latent_dim, hidden_dim=hidden_dim).to(DEVICE)
+        world_model = WorldModel(
+            obs_dim,
+            action_dim,
+            latent_dim=latent_dim,
+            hidden_dim=hidden_dim,
+            gru_num_layers=gru_num_layers,
+        ).to(DEVICE)
         if os.path.exists("world_model.pt"):
             world_model.load_state_dict(torch.load("world_model.pt", map_location=DEVICE))
             log_message("Loaded world model from world_model.pt", log_path)
@@ -780,22 +910,46 @@ def main():
         actor_weight = loss_weights.get('actor', 1.0)
         critic_weight = loss_weights.get('critic', 0.25)
         entropy_coeff = loss_weights.get('entropy', 0.01)
+        entropy_coeff_end = loss_weights.get('entropy_final', entropy_coeff)
         aux_rewards_config = phase_config.get('auxiliary_rewards', {})
         lambda_gae = phase_config.get('lambda_gae', 0.95)
         advantage_clip = phase_config.get('advantage_clip', 3.0)
         actor_grad_clip = phase_config.get('actor_grad_clip', 10.0)
+        collapse_entropy_threshold = phase_config.get('collapse_entropy_threshold', 0.2)
+        collapse_actor_grad_threshold = phase_config.get('collapse_actor_grad_threshold', 1e-3)
+        collapse_max_action_prob_threshold = phase_config.get('collapse_max_action_prob_threshold', 0.98)
+        collapse_patience_epochs = phase_config.get('collapse_patience_epochs', 3)
+        low_entropy_actor_lr_threshold = phase_config.get('low_entropy_actor_lr_threshold', 0.9)
+        reduced_actor_lr = phase_config.get('reduced_actor_lr', None)
 
-        log_message(f"Training actor-critic for {epochs} epochs with lr={lr}, horizon={horizon} (P={past_horizon}, F={future_horizon}), lambda_gae={lambda_gae}, entropy={entropy_coeff}, adv_clip={advantage_clip}, seed={args.seed}...", log_path)
-        log_message(f"Model capacity: latent_dim={latent_dim}, hidden_dim={hidden_dim}", log_path)
+        log_message(
+            f"Training actor-critic for {epochs} epochs with lr={lr}, horizon={horizon} "
+            f"(P={past_horizon}, F={future_horizon}), lambda_gae={lambda_gae}, "
+            f"entropy_decay={entropy_coeff}->{entropy_coeff_end}, adv_clip={advantage_clip}, "
+            f"seed={args.seed}...",
+            log_path,
+        )
+        log_message(
+            f"Model capacity: latent_dim={latent_dim}, hidden_dim={hidden_dim}, "
+            f"gru_num_layers={gru_num_layers}",
+            log_path,
+        )
         log_message(f"Dataset: {len(dataset)} valid (episode, start) positions", log_path)
 
         train_actor_critic(world_model, actor, critic, dataloader,
                           epochs=epochs, lr=lr, future_horizon=future_horizon,
                           lambda_gae=lambda_gae,
                           loss_weights=(actor_weight, critic_weight), entropy_coeff=entropy_coeff,
+                          entropy_coeff_end=entropy_coeff_end,
                           checkpoint_freq=checkpoint_freq, aux_rewards_config=aux_rewards_config,
                           start_epoch=start_epoch, log_path=log_path, use_warmup=True,
-                          advantage_clip=advantage_clip, actor_grad_clip=actor_grad_clip)
+                          advantage_clip=advantage_clip, actor_grad_clip=actor_grad_clip,
+                          collapse_entropy_threshold=collapse_entropy_threshold,
+                          collapse_actor_grad_threshold=collapse_actor_grad_threshold,
+                          collapse_max_action_prob_threshold=collapse_max_action_prob_threshold,
+                          collapse_patience_epochs=collapse_patience_epochs,
+                          low_entropy_actor_lr_threshold=low_entropy_actor_lr_threshold,
+                          reduced_actor_lr=reduced_actor_lr)
 
         torch.save(actor.state_dict(), "actor.pt")
         torch.save(critic.state_dict(), "critic.pt")

@@ -51,7 +51,7 @@
                 "--dataset", "lunarlander_val_dataset.npz",
                 "--config", "config.yaml",
                 "--checkpoint", "world_model.pt",
-                "--mode", "open",
+                "--mode", "teacher",
                 "--max_episodes", "20",
                 "--seed", "12345",
                 "--plot_dir", "plots",
@@ -79,6 +79,43 @@
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/test_policy.py",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "WorldModel Sim",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/worldmodel_sim.py",
+            "args": [
+                "--config", "config.yaml",
+                "--world_model", "world_model.pt",
+                "--val_dataset", "lunarlander_val_dataset.npz",
+                "--seed", "12345",
+                "--warmup_steps", "15",
+                "--fps", "30",
+                "--max_episode_steps", "500"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "WorldModel Sim (pygame)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/worldmodel_sim_pygame.py",
+            "args": [
+                "--config", "config.yaml",
+                "--world_model", "world_model.pt",
+                "--val_dataset", "lunarlander_val_dataset.npz",
+                "--seed", "12345",
+                "--warmup_steps", "15",
+                "--fps", "30",
+                "--max_episode_steps", "500",
+                "--print_every", "10",
+                "--width", "960",
+                "--height", "640"
+            ],
             "console": "integratedTerminal",
             "justMyCode": false
         }

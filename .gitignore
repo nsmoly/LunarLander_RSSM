@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+
+# Training/runtime artifacts
+checkpoints/
+plots/
+train_actorcritic_logs*.txt
+train_worldmodel_logs*.txt

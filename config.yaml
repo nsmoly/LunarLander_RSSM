@@ -3,17 +3,19 @@ world_model:
   action_dim: 4
   capacity:
     latent_dim: 64
-    hidden_dim: 128
+    hidden_dim: 384
+    gru_num_layers: 1  # Number of stacked GRU layers in RSSM
   loss_weights:
     reconstruction: 1.0
     reward: 1.2
     kl: 1.0
+    done: 0.5
   epochs: 200
   val_freq: 10
   lr: 0.0001
   beta_kl: 0.5
   batch_size: 64
-  sequence_length: 50
+  sequence_length: 30
   checkpoint_freq: 10  # Save checkpoint every 100 epochs
   
 actor_critic:
@@ -25,18 +27,26 @@ actor_critic:
   lambda_gae: 0.95   # GAE lambda: 0=1-step TD, 1=full returns, 0.95=typical hybrid
   capacity:
     latent_dim: 64
-    hidden_dim: 128
+    hidden_dim: 384
+    gru_num_layers: 1  # Must match world_model capacity for loading world_model.pt
   loss_weights:
     actor: 1.0
-    critic: 0.25
-    entropy: 0.4   # Higher to prevent policy collapse (was 0.2)
+    critic: 0.3
+    entropy: 0.5   # Entropy start (early exploration)
+    entropy_final: 0.35   # Slightly higher late exploration to reduce passive falling
   auxiliary_rewards:
-    upright_pose_weight: 0.01   # Reward for being upright (angle close to 0)
-    downward_speed_weight: 0.005  # Penalty for downward velocity (soft landing)
-  advantage_clip: 3.0   # Clip standardized advantages to ±3 for stability
-  actor_grad_clip: 10.0 # Gradient clipping for actor (tighter than 100 for stability)
-  epochs: 200
-  lr: 0.00002   # Lower for more stable updates (was 5e-5) 
+    upright_pose_weight: 0.18
+    downward_speed_weight: 0.05
+  advantage_clip: 0.9   # Slightly tighter actor update magnitude
+  actor_grad_clip: 1.8 # Slightly tighter actor gradient clipping
+  collapse_entropy_threshold: 0.35   # Stop earlier when entropy gets too low
+  collapse_actor_grad_threshold: 0.002  # Stop earlier if actor gradients fade
+  collapse_max_action_prob_threshold: 0.96  # Detect near-single-action policy earlier
+  collapse_patience_epochs: 2  # Fewer bad epochs before stop
+  low_entropy_actor_lr_threshold: 0.80  # Delay LR drop to avoid early policy passivity
+  reduced_actor_lr: 0.000008  # One-way LR drop before full collapse
+  epochs: 230
+  lr: 0.000010   # Lower base LR for better late-epoch stability
   batch_size: 64
   checkpoint_freq: 10  # Save checkpoint every 10 epochs
   
