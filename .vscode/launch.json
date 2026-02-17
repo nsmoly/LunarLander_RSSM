@@ -118,6 +118,27 @@
             ],
             "console": "integratedTerminal",
             "justMyCode": false
+        },
+        {
+            "name": "WM MPC Policy (CEM)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/wm_mpc_policy.py",
+            "args": [
+                "--config", "config.yaml",
+                "--world_model", "world_model.pt",
+                "--episodes", "10",
+                "--seed", "12345",
+                "--render",
+                "--fps", "30",
+                "--view_scale", "0.90",
+                "--horizon", "15",
+                "--population", "256",
+                "--elites", "32",
+                "--cem_iters", "4"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
         }
     ]
 }

@@ -161,6 +161,29 @@ python test_policy.py --config config.yaml
 
 ---
 
+## 7. WM MPC Policy (CEM Planner)
+
+Run model-predictive control directly in Gymnasium using the world model only (no actor network).
+At each step it plans over discrete action sequences with CEM, executes the best first action, then replans.
+
+```bash
+# Basic run (with render)
+python wm_mpc_policy.py --config config.yaml --world_model world_model.pt --render
+
+# Faster/no-render run
+python wm_mpc_policy.py --config config.yaml --world_model world_model.pt --episodes 10
+```
+
+Keyboard controls (render window):
+- `R`: toggle render on/off
+- `Q` or `ESC`: quit
+
+Useful knobs:
+- `--horizon`, `--population`, `--elites`, `--cem_iters` for planner strength/speed
+- `--w_angle`, `--w_ang_vel`, `--w_vx`, `--w_vy_down` for landing objective weights
+
+---
+
 ## Sample Files (Checked In)
 
 The repository includes sample datasets and a trained world model and actor-critic checkpoints in the root folder:
