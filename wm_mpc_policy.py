@@ -2,19 +2,22 @@ import argparse
 import os
 import random
 import time
-
-import gymnasium as gym
 import numpy as np
 import torch
 import torch.nn.functional as F
 import yaml
 
+import pygame
+import gymnasium as gym
+import gymnasium.envs.box2d.lunar_lander as lunar_lander_module
+
 from models import WorldModel
 
-try:
-    import pygame
-except ImportError:
-    pygame = None
+# IMPORTANT! We set these here and everywhere to these values to have a consistent world
+lunar_lander_module.VIEWPORT_W = 600
+lunar_lander_module.VIEWPORT_H = 400
+lunar_lander_module.SCALE = 30
+lunar_lander_module.FPS = 50 
 
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -143,18 +146,6 @@ def cem_plan(world_model, h0, z0, action_dim, args):
     return selected_action, best_score
 
 
-def maybe_init_pygame(args):
-    if not args.render:
-        return None, None
-    if pygame is None:
-        print("pygame is not installed. Running without render window.")
-        return None, None
-    pygame.init()
-    pygame.display.set_caption("WM MPC Policy")
-    screen = pygame.display.set_mode((args.width, args.height))
-    font = pygame.font.SysFont("consolas", 18)
-    return screen, font
-
 
 def handle_events(render_enabled):
     if pygame is None:
@@ -173,14 +164,13 @@ def handle_events(render_enabled):
     return quit_requested, render_enabled
 
 
-def draw_frame(screen, font, frame, lines, render_enabled, view_scale=1.0):
+def draw_frame(screen, font, frame, lines, render_enabled):
     if pygame is None or screen is None:
         return
-    if render_enabled:
+    if render_enabled and frame is not None:
         surface = pygame.surfarray.make_surface(np.transpose(frame, (1, 0, 2)))
         screen_w, screen_h = screen.get_size()
-        target_w = max(1, int(screen_w * view_scale))
-        target_h = max(1, int(screen_h * view_scale))
+        target_w, target_h = screen_w, screen_h
         surface = pygame.transform.smoothscale(surface, (target_w, target_h))
         screen.fill((0, 0, 0))
         x_off = (screen_w - target_w) // 2
@@ -208,16 +198,6 @@ def main():
     parser.add_argument("--seed", type=int, default=12345, help="Random seed")
     parser.add_argument("--max_steps", type=int, default=600, help="Max steps per episode")
     parser.add_argument("--render", action="store_true", help="Enable render window")
-    parser.add_argument("--width", type=int, default=960, help="Render window width")
-    parser.add_argument("--height", type=int, default=640, help="Render window height")
-    parser.add_argument("--fps", type=int, default=30, help="Render FPS cap")
-    parser.add_argument(
-        "--view_scale",
-        type=float,
-        default=0.90,
-        help="Rendered frame scale in window (<1.0 zoom out, >1.0 zoom in)",
-    )
-
     parser.add_argument("--horizon", type=int, default=15, help="MPC planning horizon")
     parser.add_argument("--population", type=int, default=256, help="CEM population size")
     parser.add_argument("--elites", type=int, default=32, help="Number of elites in CEM")
@@ -243,8 +223,6 @@ def main():
         raise ValueError("population must be >= 2")
     if args.elites < 1 or args.elites > args.population:
         raise ValueError("elites must be in [1, population]")
-    if args.view_scale <= 0.0:
-        raise ValueError("view_scale must be > 0")
 
     set_seed(args.seed)
 
@@ -253,8 +231,11 @@ def main():
     obs_dim = env.observation_space.shape[0]
     world_model, action_dim = load_world_model(args.config, args.world_model, obs_dim)
 
-    screen, font = maybe_init_pygame(args)
-    clock = pygame.time.Clock() if (pygame is not None and args.render) else None
+    pygame.init()
+    pygame.display.set_caption("WorldModel MPC Policy")
+    screen = pygame.display.set_mode((lunar_lander_module.VIEWPORT_W, lunar_lander_module.VIEWPORT_H))
+    font = pygame.font.SysFont("consolas", 18)
+    clock = pygame.time.Clock()
     render_enabled = bool(args.render and screen is not None)
 
     print(
@@ -301,11 +282,10 @@ def main():
                 f"Episode {ep}/{args.episodes} Step {step}",
                 f"Real reward {reward:+.3f}  Episode return {ep_return:+.2f}",
                 f"CEM best score {best_score:+.3f}  Chosen action {action}",
-                f"FPS cap {args.fps}  Measured {fps_est:.1f}",
+                f"FPS cap {lunar_lander_module.FPS}  Measured {fps_est:.1f}",
             ]
-            draw_frame(screen, font, frame, overlay, render_enabled, view_scale=args.view_scale)
-            if clock is not None:
-                clock.tick(args.fps)
+            draw_frame(screen, font, frame, overlay, render_enabled)
+            clock.tick(lunar_lander_module.FPS)  # Must match gym physics FPS
 
             if done:
                 break

@@ -1,9 +1,16 @@
 # collect_dataset.py
 import argparse
 import gymnasium as gym
+import gymnasium.envs.box2d.lunar_lander as lunar_lander_module
 import numpy as np
 import pygame
 from pygame.locals import K_LEFT, K_RIGHT, K_UP, K_DOWN, K_ESCAPE, QUIT, KEYDOWN
+
+# IMPORTANT! We set these here and everywhere to these values to have a consistent world
+lunar_lander_module.VIEWPORT_W = 600
+lunar_lander_module.VIEWPORT_H = 400
+lunar_lander_module.SCALE = 30
+lunar_lander_module.FPS = 50  
 
 # Dataset format (per-step rows):
 # [ep_index, step_index, obs_t, action_t, reward_t, next_obs_t, done_t, episode_seed]
@@ -25,15 +32,13 @@ def main():
     args = parser.parse_args()
 
     rng = np.random.default_rng(args.seed)
-    env = gym.make("LunarLander-v3", render_mode="human")
-    env.unwrapped.SCALE = 20  # Zoom out by reducing scale (default 30)
     episode_seed = int(rng.integers(0, 2**31 - 1))
+    env = gym.make("LunarLander-v3", render_mode="human")
     obs, _ = env.reset(seed=episode_seed)
 
     pygame.init()
-    screen = pygame.display.set_mode((600, 400))  # Match viewport size
-    pygame.display.set_caption("LunarLander Keyboard Controller")
-    clock = pygame.time.Clock()  # Control frame rate
+    pygame.display.set_caption("LunarLander Dataset Collector")
+    clock = pygame.time.Clock()
 
     current_obs = obs
     done = False
@@ -90,15 +95,15 @@ def main():
 
         episode_reward += reward
         episode_length += 1
-
         current_obs = next_obs
         step_index += 1
-        env.render()
 
-        clock.tick(60)  # Limit to 60 FPS for better control
+        env.render()
+        clock.tick(lunar_lander_module.FPS)
 
         if done:
             print(f"Episode {ep_index} collected, length={episode_length}, total_reward={episode_reward:.2f}")
+            # Resetting for the next episode
             ep_index += 1
             step_index = 0
             episode_reward = 0.0

@@ -22,7 +22,6 @@
                 "--dataset", "lunarlander_dataset.npz",
                 "--episodes", "200",
                 "--seed", "12345",
-                "--sleep", "0.02"
             ],
             "console": "integratedTerminal",
             "justMyCode": false
@@ -130,8 +129,6 @@
                 "--episodes", "10",
                 "--seed", "12345",
                 "--render",
-                "--fps", "30",
-                "--view_scale", "0.90",
                 "--horizon", "15",
                 "--population", "256",
                 "--elites", "32",

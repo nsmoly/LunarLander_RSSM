@@ -2,7 +2,14 @@ import argparse
 import time
 import numpy as np
 import gymnasium as gym
+import gymnasium.envs.box2d.lunar_lander as lunar_lander_module
+import pygame
 
+# IMPORTANT! We set these here and everywhere to these values to have a consistent world
+lunar_lander_module.VIEWPORT_W = 600
+lunar_lander_module.VIEWPORT_H = 400
+lunar_lander_module.SCALE = 30
+lunar_lander_module.FPS = 50  
 
 def main():
     parser = argparse.ArgumentParser(description="Replay dataset episodes in LunarLander")
@@ -12,8 +19,6 @@ def main():
                         help="Number of episodes to replay")
     parser.add_argument("--seed", type=int, default=0,
                         help="Random seed for selecting episodes")
-    parser.add_argument("--sleep", type=float, default=0.02,
-                        help="Sleep between steps (seconds)")
     args = parser.parse_args()
 
     data = np.load(args.dataset)
@@ -33,13 +38,17 @@ def main():
 
     env = gym.make("LunarLander-v3", render_mode="human")
 
-    for i, ep_idx in enumerate(picks, start=1):
-        ep_id = episode_ids[ep_idx]
-        mask = ep_index == ep_id
-        order = np.argsort(step_index[mask], kind="stable")
-        ep_actions = actions[mask][order]
+    pygame.init()
+    pygame.display.set_caption("LunarLander Dataset Replay")
+    clock = pygame.time.Clock()
+
+    for i, pick_idx in enumerate(picks, start=1):
+        ep_id = episode_ids[pick_idx]
+        episode_mask = (ep_index == ep_id)
+        order = np.argsort(step_index[episode_mask], kind="stable")
+        ep_actions = actions[episode_mask][order]
         if episode_seed is not None:
-            ep_seed = int(episode_seed[mask][0])
+            ep_seed = int(episode_seed[episode_mask][0])
             obs, _ = env.reset(seed=ep_seed)
         else:
             obs, _ = env.reset(seed=args.seed + i)
@@ -48,7 +57,10 @@ def main():
         for a in ep_actions:
             obs, reward, terminated, truncated, _ = env.step(int(a))
             total_reward += reward
-            time.sleep(args.sleep)
+            
+            env.render()
+            clock.tick(lunar_lander_module.FPS)
+
             if terminated or truncated:
                 break
 
