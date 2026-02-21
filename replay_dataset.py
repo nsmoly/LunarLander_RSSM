@@ -56,12 +56,13 @@ def main():
 
         for a in ep_actions:
             obs, reward, terminated, truncated, _ = env.step(int(a))
+            done = terminated or truncated
             total_reward += reward
             
             env.render()
             clock.tick(lunar_lander_module.FPS)
 
-            if terminated or truncated:
+            if done:
                 break
 
         print(f"Episode {i}/{num} (dataset ep {int(ep_id)}) length={len(ep_actions)} reward={total_reward:.2f}")

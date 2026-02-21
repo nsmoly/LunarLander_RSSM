@@ -1,11 +1,20 @@
 # test_policy.py
 import argparse
 import os
-import gymnasium as gym
 import torch
 import yaml
+import gymnasium as gym
+import gymnasium.envs.box2d.lunar_lander as lunar_lander_module
+import pygame
+from pygame.locals import K_LEFT, K_RIGHT, K_UP, K_DOWN, K_ESCAPE, QUIT, KEYDOWN
 
 from models import WorldModel, Actor
+
+# IMPORTANT! We set these here and everywhere to these values to have a consistent world
+lunar_lander_module.VIEWPORT_W = 600
+lunar_lander_module.VIEWPORT_H = 400
+lunar_lander_module.SCALE = 30
+lunar_lander_module.FPS = 50  
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -50,8 +59,12 @@ def main():
     latent_dim, hidden_dim, gru_num_layers, action_dim = load_config(args.config)
 
     env = gym.make("LunarLander-v3", render_mode="human")
-    obs, _ = env.reset()
+    
+    pygame.init()
+    pygame.display.set_caption("LunarLander Policy Test")
+    clock = pygame.time.Clock()
 
+    obs, _ = env.reset()
     obs_dim = env.observation_space.shape[0]
 
     world_model = WorldModel(
@@ -98,18 +111,30 @@ def main():
         mean_post, logstd_post = world_model.rssm.posterior(h, obs_t)
         z = world_model.rssm.sample_latent(mean_post, logstd_post)
 
-        while True:
-            dist = actor(z)
-            if args.deterministic:
-                action = torch.argmax(dist.probs, dim=-1).item()
-            else:
-                action = dist.sample().item()
-            print(f"Action: {action}, Probs: {dist.probs.cpu().numpy().flatten()}")
+        running = True
+        while running:
+            # Handle keyboard events
+            for event in pygame.event.get():
+                if event.type == QUIT:
+                    running = False
+                elif event.type == KEYDOWN:
+                    if event.key == K_ESCAPE:
+                        running = False
 
-            next_obs, reward, terminated, truncated, info = env.step(action)
+            # Get action from the policy
+            action_dist = actor(z)
+            if args.deterministic:
+                action = torch.argmax(action_dist.probs, dim=-1).item()
+            else:
+                action = action_dist.sample().item()
+            print(f"Action: {action}, Probs: {action_dist.probs.cpu().numpy().flatten()}")
+
+            # Execute this action in the environment and get the next observation, reward, and done flag
+            next_obs, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
             total_reward += reward
 
+            # Update world model
             a_onehot = torch.nn.functional.one_hot(
                 torch.tensor([action], device=DEVICE), num_classes=action_dim
             ).float()
@@ -119,8 +144,11 @@ def main():
             z = world_model.rssm.sample_latent(mean_post, logstd_post)
 
             env.render()
+            clock.tick(lunar_lander_module.FPS)
+
             if done:
                 print("Episode done, total_reward:", total_reward)
+                # Reset the world model and actor states
                 total_reward = 0.0
                 obs, _ = env.reset()
                 obs_t = torch.tensor(obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)

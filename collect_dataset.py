@@ -65,11 +65,9 @@ def main():
         for event in pygame.event.get():
             if event.type == QUIT:
                 running = False
-                done = True
             elif event.type == KEYDOWN:
                 if event.key == K_ESCAPE:
                     running = False
-                    done = True
 
         # Get held keys for continuous control
         keys = pygame.key.get_pressed()
