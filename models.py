@@ -1,12 +1,14 @@
-# models.py
+# models.py - World model and actor-critic models definitions
 import torch
 import torch.nn as nn
 
-# you can tune:
-# latent_dim (e.g., 32, 64, 128, …)
-# hidden_dim in RSSM, WorldModel, Actor, Critic
+# You can tune:
+#   latent_dim (e.g., 32, 64, 128, …)
+#   hidden_dim in RSSM, WorldModel, Actor, Critic
+#   number of layers in the GRU in the RSSM
 # Smaller values → lighter GPU load, faster training.
 
+# Recurrent State Space Model (RSSM) for the latent world model
 class RSSM(nn.Module):
     def __init__(self, obs_dim, action_dim, latent_dim=64, hidden_dim=128, gru_num_layers=1):
         super().__init__()
@@ -62,11 +64,14 @@ class RSSM(nn.Module):
 
     def update_hidden(self, h, z_prev, action_prev):
         gru_in = torch.cat([z_prev, action_prev], dim=-1)
+
+        # Run GRU with a single layer
         if self.gru_num_layers == 1:
             if h.dim() == 3:
                 h = h[:, 0, :]
             return self.gru(gru_in, h)
 
+        # Run GRU with multiple layers (prepare hidden states if needed)
         if h.dim() == 2:
             h_prev = torch.zeros(
                 h.size(0), self.gru_num_layers, self.hidden_dim, device=h.device, dtype=h.dtype
@@ -83,10 +88,13 @@ class RSSM(nn.Module):
             layer_in = h_i
         return torch.stack(states, dim=1)
 
+
     def prior(self, h):
         out = self.prior_net(self.top_hidden(h))
         mean, logstd = out.chunk(2, dim=-1)
-        logstd = logstd.clamp(-5, 2)
+        # Clamp logstd to prevent numerical instability
+        # values are selected based on experience, but they may need to be changed if training fails
+        logstd = logstd.clamp(-5, 2) 
         return mean, logstd
 
     def posterior(self, h, obs):
@@ -94,6 +102,8 @@ class RSSM(nn.Module):
         post_in = torch.cat([self.top_hidden(h), obs_enc], dim=-1)
         out = self.post_net(post_in)
         mean, logstd = out.chunk(2, dim=-1)
+        # Clamp logstd to prevent numerical instability
+        # values are selected based on experience, but they may need to be changed if training fails
         logstd = logstd.clamp(-5, 2)
         return mean, logstd
 
@@ -108,10 +118,13 @@ class RSSM(nn.Module):
         z_t = self.sample_latent(mean_post, logstd_post)
         return h_t, z_t, mean_post, logstd_post, mean_prior, logstd_prior
 
+
 class WorldModel(nn.Module):
     def __init__(self, obs_dim, action_dim, latent_dim=64, hidden_dim=128, gru_num_layers=1):
         super().__init__()
+        
         self.rssm = RSSM(obs_dim, action_dim, latent_dim, hidden_dim, gru_num_layers=gru_num_layers)
+        
         self.obs_decoder = nn.Sequential(
             nn.Linear(latent_dim + hidden_dim, hidden_dim),
             nn.ReLU(),
@@ -119,6 +132,7 @@ class WorldModel(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim, obs_dim),
         )
+
         self.reward_head = nn.Sequential(
             nn.Linear(latent_dim + hidden_dim, hidden_dim),
             nn.ReLU(),
@@ -126,6 +140,7 @@ class WorldModel(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim, 1),
         )
+
         self.done_head = nn.Sequential(
             nn.Linear(latent_dim + hidden_dim, hidden_dim),
             nn.ReLU(),

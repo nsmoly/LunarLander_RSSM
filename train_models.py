@@ -1,4 +1,4 @@
-# train_models.py - World model and actor-critic training for LunarLander Dreamer
+# train_models.py - World model and actor-critic training
 import argparse
 import os
 import random
@@ -61,7 +61,7 @@ def save_checkpoint_with_timestamp(model, model_name, epoch, directory=CHECKPOIN
 
 
 # -----------------------------------------------------------------------------
-# World model: SequenceDataset for sequence-based training
+# SequenceDataset for sequence-based training
 # -----------------------------------------------------------------------------
 class SequenceDataset(Dataset):
     """Samples sequences from real episodes for world model training."""
@@ -77,25 +77,29 @@ class SequenceDataset(Dataset):
         self.sequence_length = int(sequence_length)
         self.random_start = bool(random_start)
         self.obs_dim = self.obs.shape[1]
-        self.action_dim = int(action_dim)
+        self.action_dim = int(action_dim) # need to pass action_dim since we only store action IDs in the dataset
         if self.actions.size and self.actions.max() >= self.action_dim:
             raise ValueError(
                 f"Dataset actions exceed action_dim={self.action_dim}; "
                 f"max action={int(self.actions.max())}"
             )
 
+        # The dataset is stored as a set of episodes, each with a set of steps.
+        # We need to store the indices of the episodes.
+        # We also need to sort the steps within each episode and store the indices of the steps.
+        # We use this to sample sequences from the dataset.
         self.episode_ids = np.unique(self.ep_index)
         self.episode_indices = []
         self.start_positions = []
         for ep_id in self.episode_ids:
-            idxs = np.where(self.ep_index == ep_id)[0]
-            if idxs.size == 0:
+            data_idxs = np.where(self.ep_index == ep_id)[0]
+            if data_idxs.size == 0:
                 continue
-            order = np.argsort(self.step_index[idxs], kind="stable")
-            idxs = idxs[order]
+            order = np.argsort(self.step_index[data_idxs], kind="stable")
+            data_idxs = data_idxs[order]
             ep_pos = len(self.episode_indices)
-            self.episode_indices.append(idxs)
-            for pos in range(len(idxs)):
+            self.episode_indices.append(data_idxs)
+            for pos in range(len(data_idxs)):
                 self.start_positions.append((ep_pos, pos))
 
     def __len__(self):
@@ -106,7 +110,7 @@ class SequenceDataset(Dataset):
             ep_pos, start = self.start_positions[np.random.randint(len(self.start_positions))]
         else:
             ep_pos, start = self.start_positions[idx]
-        idxs = self.episode_indices[ep_pos]
+        data_idxs = self.episode_indices[ep_pos]
 
         obs_seq = np.zeros((self.sequence_length, self.obs_dim), dtype=np.float32)
         actions_seq = np.zeros((self.sequence_length,), dtype=np.int64)
@@ -115,51 +119,25 @@ class SequenceDataset(Dataset):
         dones_seq = np.zeros((self.sequence_length,), dtype=np.int64)
         mask = np.zeros((self.sequence_length,), dtype=np.float32)
 
-        max_len = len(idxs) - start
+        max_len = len(data_idxs) - start
         for t in range(self.sequence_length):
             if t >= max_len:
                 break
-            idx_t = idxs[start + t]
-            obs_seq[t] = self.obs[idx_t]
-            actions_seq[t] = self.actions[idx_t]
-            rewards_seq[t] = self.rewards[idx_t]
-            next_obs_seq[t] = self.next_obs[idx_t]
-            dones_seq[t] = self.dones[idx_t]
-            mask[t] = 1.0
-            if self.dones[idx_t] == 1:
+            index_t = data_idxs[start + t]
+            obs_seq[t] = self.obs[index_t]
+            actions_seq[t] = self.actions[index_t]
+            rewards_seq[t] = self.rewards[index_t]
+            next_obs_seq[t] = self.next_obs[index_t]
+            dones_seq[t] = self.dones[index_t]
+            mask[t] = 1.0   # mask is needed to support variable-length sequences
+            if self.dones[index_t] == 1:
                 break
 
         return obs_seq, actions_seq, rewards_seq, next_obs_seq, dones_seq, mask
 
 
 # -----------------------------------------------------------------------------
-# Actor-critic: TransitionDataset for single-transition batches (legacy)
-# -----------------------------------------------------------------------------
-class TransitionDataset(Dataset):
-    """Single transitions for actor-critic imagination init."""
-    def __init__(self, path):
-        data = np.load(path)
-        self.obs = data["obs"].astype(np.float32)
-        self.actions = data["actions"].astype(np.int64)
-        self.rewards = data["rewards"].astype(np.float32)
-        self.next_obs = data["next_obs"].astype(np.float32)
-        self.dones = data["dones"].astype(np.float32)
-
-    def __len__(self):
-        return len(self.obs)
-
-    def __getitem__(self, idx):
-        return (
-            self.obs[idx],
-            self.actions[idx],
-            self.rewards[idx],
-            self.dones[idx],
-            self.next_obs[idx],
-        )
-
-
-# -----------------------------------------------------------------------------
-# Actor-critic: WarmupDataset for episode+start sampling with warm-up
+# ActorCriticWarmupDataset for episode sampling (their starts) for world model warm-up
 # -----------------------------------------------------------------------------
 class ActorCriticWarmupDataset(Dataset):
     """Samples (episode, start) where start + horizon <= first_done. Returns obs_past, actions_past for warm-up."""
@@ -182,27 +160,27 @@ class ActorCriticWarmupDataset(Dataset):
         self.episode_ids = np.unique(self.ep_index)
         self.start_positions = []  # (ep_pos, start_step)
         for ep_id in self.episode_ids:
-            idxs = np.where(self.ep_index == ep_id)[0]
-            if idxs.size == 0:
+            data_idxs = np.where(self.ep_index == ep_id)[0]
+            if data_idxs.size == 0:
                 continue
-            order = np.argsort(self.step_index[idxs], kind="stable")
-            idxs = idxs[order]
-            first_done = np.where(self.dones[idxs] == 1)[0]
-            first_done_idx = int(first_done[0]) if first_done.size > 0 else len(idxs)
+            order = np.argsort(self.step_index[data_idxs], kind="stable")
+            data_idxs = data_idxs[order]
+            first_done = np.where(self.dones[data_idxs] == 1)[0]
+            first_done_idx = int(first_done[0]) if first_done.size > 0 else len(data_idxs)
             max_start = first_done_idx - self.horizon
             if max_start < 0:
                 continue
             for start in range(max_start + 1):
-                self.start_positions.append((idxs, start))
+                self.start_positions.append((data_idxs, start))
 
     def __len__(self):
         return len(self.start_positions)
 
     def __getitem__(self, idx):
-        idxs, start = self.start_positions[idx]
+        data_idxs, start = self.start_positions[idx]
         P = self.past_horizon
-        obs_past = self.obs[idxs[start : start + P]].astype(np.float32)  # (P, obs_dim)
-        actions_past = self.actions[idxs[start : start + P]].astype(np.int64)  # (P,)
+        obs_past = self.obs[data_idxs[start : start + P]].astype(np.float32)  # (P, obs_dim)
+        actions_past = self.actions[data_idxs[start : start + P]].astype(np.int64)  # (P,)
         return obs_past, actions_past
 
 
@@ -219,7 +197,97 @@ def kl_divergence(mean_q, logstd_q, mean_p, logstd_p):
     ).sum(-1)
 
 
+def train_world_model(world_model, train_dataloader, val_dataloader, epochs=10, start_epoch=0,
+                     checkpoint_freq=100, val_freq=10, lr=3e-4, beta_kl=1.0, loss_weights=(1.0, 1.0, 1.0, 0.5),
+                     log_path=None):
+    
+    world_model.train()
+    opt = optim.AdamW(world_model.parameters(), lr=lr)
+
+    if start_epoch >= epochs:
+        log_message(f"Start epoch {start_epoch} is >= total epochs {epochs}; nothing to train.", log_path)
+        return
+
+    for epoch in range(start_epoch + 1, epochs + 1):
+        
+        train_loss = 0.0
+        for batch in train_dataloader:
+            obs_seq, actions_seq, rewards_seq, next_obs_seq, dones_seq, mask = batch
+            obs_seq = obs_seq.to(DEVICE)
+            actions_seq = actions_seq.to(DEVICE)
+            rewards_seq = rewards_seq.to(DEVICE)
+            dones_seq = dones_seq.to(DEVICE).float()
+            mask = mask.to(DEVICE)
+
+            batch_size, seq_len = obs_seq.shape[:2]
+            action_dim = world_model.rssm.action_dim
+            latent_dim = world_model.rssm.latent_dim
+
+            h = world_model.rssm.init_hidden(batch_size, DEVICE)
+            z_prev = torch.zeros(batch_size, latent_dim, device=DEVICE)
+            a_prev = torch.zeros(batch_size, action_dim, device=DEVICE)
+
+            sum_recon = 0.0
+            sum_rew = 0.0
+            sum_kl = 0.0
+            sum_done = 0.0
+            total_mask = mask.sum().clamp_min(1.0)
+
+            for t in range(seq_len):
+                h = world_model.rssm.update_hidden(h, z_prev, a_prev)
+                mean_prior, logstd_prior = world_model.rssm.prior(h)
+                mean_post, logstd_post = world_model.rssm.posterior(h, obs_seq[:, t])
+                z_t = world_model.rssm.sample_latent(mean_post, logstd_post)
+
+                obs_pred = world_model.reconstruct_obs(h, z_t)
+                reward_pred = world_model.predict_reward(h, z_t)
+                done_logits = world_model.predict_done_logits(h, z_t)
+
+                recon_loss = (obs_pred - obs_seq[:, t]).pow(2).sum(-1)
+                reward_loss = (reward_pred - rewards_seq[:, t]).pow(2)
+                done_loss = F.binary_cross_entropy_with_logits(done_logits, dones_seq[:, t], reduction="none")
+                kl = kl_divergence(mean_post, logstd_post, mean_prior, logstd_prior)
+
+                mask_t = mask[:, t]
+                sum_recon += (recon_loss * mask_t).sum()
+                sum_rew += (reward_loss * mask_t).sum()
+                sum_done += (done_loss * mask_t).sum()
+                sum_kl += (kl * mask_t).sum()
+
+                z_prev = z_t
+                a_prev = torch.nn.functional.one_hot(actions_seq[:, t], num_classes=action_dim).float()
+
+            loss = (
+                loss_weights[0] * sum_recon
+                + loss_weights[1] * sum_rew
+                + loss_weights[3] * sum_done
+                + loss_weights[2] * beta_kl * sum_kl
+            ) / total_mask
+
+            opt.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(world_model.parameters(), 100.0)
+            opt.step()
+
+            train_loss += loss.item()
+
+        train_loss /= len(train_dataloader)
+
+        if epoch % val_freq == 0:
+            val_metrics = validate_world_model(world_model, val_dataloader, beta_kl, loss_weights)
+            log_message(f"[WorldModel] Epoch {epoch}, train_loss={train_loss:.4f}, val_loss={val_metrics['loss']:.4f}", log_path)
+            log_message(f"  Validation Metrics - Obs MAE: {val_metrics['obs_mae']:.4f}, Obs RMSE: {val_metrics['obs_rmse']:.4f}", log_path)
+            log_message(f"  Reward MAE: {val_metrics['reward_mae']:.4f}, Reward RMSE: {val_metrics['reward_rmse']:.4f}, Reward Sign Acc: {val_metrics['reward_sign_acc']:.3f}", log_path)
+            log_message(f"  Done Acc: {val_metrics['done_acc']:.3f}", log_path)
+        else:
+            log_message(f"[WorldModel] Epoch {epoch}, train_loss={train_loss:.4f}", log_path)
+
+        if epoch % checkpoint_freq == 0:
+            save_checkpoint_with_timestamp(world_model, "world_model", epoch, log_path=log_path)
+
+
 def validate_world_model(world_model, val_dataloader, beta_kl=1.0, loss_weights=(1.0, 1.0, 1.0, 0.5)):
+    
     world_model.eval()
     obs_dim = world_model.rssm.obs_dim
 
@@ -332,105 +400,9 @@ def validate_world_model(world_model, val_dataloader, beta_kl=1.0, loss_weights=
     }
 
 
-def train_world_model(world_model, train_dataloader, val_dataloader, epochs=10, start_epoch=0,
-                     checkpoint_freq=100, val_freq=10, lr=3e-4, beta_kl=1.0, loss_weights=(1.0, 1.0, 1.0, 0.5),
-                     log_path=None):
-    world_model.train()
-    opt = optim.AdamW(world_model.parameters(), lr=lr)
-
-    if start_epoch >= epochs:
-        log_message(f"Start epoch {start_epoch} is >= total epochs {epochs}; nothing to train.", log_path)
-        return
-
-    for epoch in range(start_epoch + 1, epochs + 1):
-        train_loss = 0.0
-        for batch in train_dataloader:
-            obs_seq, actions_seq, rewards_seq, next_obs_seq, dones_seq, mask = batch
-            obs_seq = obs_seq.to(DEVICE)
-            actions_seq = actions_seq.to(DEVICE)
-            rewards_seq = rewards_seq.to(DEVICE)
-            dones_seq = dones_seq.to(DEVICE).float()
-            mask = mask.to(DEVICE)
-
-            batch_size, seq_len = obs_seq.shape[:2]
-            action_dim = world_model.rssm.action_dim
-            latent_dim = world_model.rssm.latent_dim
-
-            h = world_model.rssm.init_hidden(batch_size, DEVICE)
-            z_prev = torch.zeros(batch_size, latent_dim, device=DEVICE)
-            a_prev = torch.zeros(batch_size, action_dim, device=DEVICE)
-
-            sum_recon = 0.0
-            sum_rew = 0.0
-            sum_kl = 0.0
-            sum_done = 0.0
-            total_mask = mask.sum().clamp_min(1.0)
-
-            for t in range(seq_len):
-                h = world_model.rssm.update_hidden(h, z_prev, a_prev)
-                mean_prior, logstd_prior = world_model.rssm.prior(h)
-                mean_post, logstd_post = world_model.rssm.posterior(h, obs_seq[:, t])
-                z_t = world_model.rssm.sample_latent(mean_post, logstd_post)
-
-                obs_pred = world_model.reconstruct_obs(h, z_t)
-                reward_pred = world_model.predict_reward(h, z_t)
-                done_logits = world_model.predict_done_logits(h, z_t)
-
-                recon_loss = (obs_pred - obs_seq[:, t]).pow(2).sum(-1)
-                reward_loss = (reward_pred - rewards_seq[:, t]).pow(2)
-                done_loss = F.binary_cross_entropy_with_logits(done_logits, dones_seq[:, t], reduction="none")
-                kl = kl_divergence(mean_post, logstd_post, mean_prior, logstd_prior)
-
-                mask_t = mask[:, t]
-                sum_recon += (recon_loss * mask_t).sum()
-                sum_rew += (reward_loss * mask_t).sum()
-                sum_done += (done_loss * mask_t).sum()
-                sum_kl += (kl * mask_t).sum()
-
-                z_prev = z_t
-                a_prev = torch.nn.functional.one_hot(actions_seq[:, t], num_classes=action_dim).float()
-
-            loss = (
-                loss_weights[0] * sum_recon
-                + loss_weights[1] * sum_rew
-                + loss_weights[3] * sum_done
-                + loss_weights[2] * beta_kl * sum_kl
-            ) / total_mask
-
-            opt.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(world_model.parameters(), 100.0)
-            opt.step()
-
-            train_loss += loss.item()
-
-        train_loss /= len(train_dataloader)
-
-        if epoch % val_freq == 0:
-            val_metrics = validate_world_model(world_model, val_dataloader, beta_kl, loss_weights)
-            log_message(f"[WorldModel] Epoch {epoch}, train_loss={train_loss:.4f}, val_loss={val_metrics['loss']:.4f}", log_path)
-            log_message(f"  Validation Metrics - Obs MAE: {val_metrics['obs_mae']:.4f}, Obs RMSE: {val_metrics['obs_rmse']:.4f}", log_path)
-            log_message(f"  Reward MAE: {val_metrics['reward_mae']:.4f}, Reward RMSE: {val_metrics['reward_rmse']:.4f}, Reward Sign Acc: {val_metrics['reward_sign_acc']:.3f}", log_path)
-            log_message(f"  Done Acc: {val_metrics['done_acc']:.3f}", log_path)
-        else:
-            log_message(f"[WorldModel] Epoch {epoch}, train_loss={train_loss:.4f}", log_path)
-
-        if epoch % checkpoint_freq == 0:
-            save_checkpoint_with_timestamp(world_model, "world_model", epoch, log_path=log_path)
-
-
 # -----------------------------------------------------------------------------
-# Actor-critic: auxiliary rewards and imagination
+# Actor-critic: imagination
 # -----------------------------------------------------------------------------
-def compute_auxiliary_rewards(observations, upright_weight=0.1, downward_speed_weight=0.05):
-    """Auxiliary rewards for upright pose and minimal downward speed."""
-    angles = observations[..., 4]
-    y_velocities = observations[..., 3]
-    upright_reward = upright_weight * torch.exp(-torch.abs(angles))
-    downward_penalty = downward_speed_weight * torch.clamp(y_velocities, max=0.0)
-    return upright_reward + downward_penalty
-
-
 def imagine_rollout(world_model, actor, start_obs, horizon=15):
     """Imagine latent rollouts from start_obs, returning zs, rewards, actions, observations."""
     world_model.eval()
@@ -527,7 +499,7 @@ def train_actor_critic(world_model, actor, critic, dataloader,
                        epochs=10, lr=3e-4, gamma=0.99, lambda_gae=0.95,
                        future_horizon=15, loss_weights=(1.0, 1.0), entropy_coeff=0.01,
                        entropy_coeff_end=None,
-                       checkpoint_freq=100, aux_rewards_config=None, start_epoch=0, log_path=None,
+                       checkpoint_freq=100, start_epoch=0, log_path=None,
                        use_warmup=True, advantage_clip=3.0, actor_grad_clip=10.0,
                        collapse_entropy_threshold=0.2, collapse_actor_grad_threshold=1e-3,
                        collapse_max_action_prob_threshold=0.98, collapse_patience_epochs=3,
@@ -537,8 +509,6 @@ def train_actor_critic(world_model, actor, critic, dataloader,
     critic.train()
     opt_actor = optim.AdamW(actor.parameters(), lr=lr)
     opt_critic = optim.AdamW(critic.parameters(), lr=lr)
-
-    aux_rewards_config = aux_rewards_config or {}
 
     if entropy_coeff_end is None:
         entropy_coeff_end = entropy_coeff
@@ -570,8 +540,6 @@ def train_actor_critic(world_model, actor, critic, dataloader,
         total_max_action_prob = 0.0
         total_actor_grad_norm = 0.0
         total_critic_grad_norm = 0.0
-        total_aux_upright = 0.0
-        total_aux_downward = 0.0
         num_batches = 0
 
         for batch in dataloader:
@@ -593,13 +561,6 @@ def train_actor_critic(world_model, actor, critic, dataloader,
             imagined_rewards = imagined_rewards.detach()
             imagined_actions = imagined_actions.detach()
             imagined_observations = imagined_observations.detach()
-
-            aux_rewards = compute_auxiliary_rewards(
-                imagined_observations,
-                upright_weight=aux_rewards_config.get('upright_pose_weight', 0.1),
-                downward_speed_weight=aux_rewards_config.get('downward_speed_weight', 0.05)
-            )
-            imagined_rewards = imagined_rewards + aux_rewards
 
             with torch.no_grad():
                 values = critic(zs)
@@ -642,10 +603,6 @@ def train_actor_critic(world_model, actor, critic, dataloader,
             value_mae = torch.abs(value_pred - returns.reshape(-1).detach()).mean().item()
             entropy = dist.entropy().mean().item()
             max_action_prob = dist.probs.max(dim=-1).values.mean().item()
-            angles = imagined_observations[..., 4]
-            y_velocities = imagined_observations[..., 3]
-            upright_reward = aux_rewards_config.get('upright_pose_weight', 0.1) * torch.exp(-torch.abs(angles)).mean().item()
-            downward_penalty = aux_rewards_config.get('downward_speed_weight', 0.05) * torch.clamp(y_velocities, max=0.0).mean().item()
 
             total_actor_loss += actor_loss.item()
             total_critic_loss += critic_loss.item()
@@ -655,8 +612,6 @@ def train_actor_critic(world_model, actor, critic, dataloader,
             total_max_action_prob += max_action_prob
             total_actor_grad_norm += actor_grad_norm.item()
             total_critic_grad_norm += critic_grad_norm.item()
-            total_aux_upright += upright_reward
-            total_aux_downward += downward_penalty
             num_batches += 1
 
         avg_actor_loss = total_actor_loss / num_batches
@@ -667,8 +622,6 @@ def train_actor_critic(world_model, actor, critic, dataloader,
         avg_max_action_prob = total_max_action_prob / num_batches
         avg_actor_grad_norm = total_actor_grad_norm / num_batches
         avg_critic_grad_norm = total_critic_grad_norm / num_batches
-        avg_aux_upright = total_aux_upright / num_batches
-        avg_aux_downward = total_aux_downward / num_batches
 
         log_message(f"[ActorCritic] Epoch {epoch}, actor_loss={avg_actor_loss:.4f}, critic_loss={avg_critic_loss:.4f}", log_path)
         log_message(
@@ -678,7 +631,6 @@ def train_actor_critic(world_model, actor, critic, dataloader,
             log_path,
         )
         log_message(f"  Grad Norms - Actor: {avg_actor_grad_norm:.4f}, Critic: {avg_critic_grad_norm:.4f}", log_path)
-        log_message(f"  Aux Rewards - Upright: {avg_aux_upright:.4f}, Downward Penalty: {avg_aux_downward:.4f}", log_path)
 
         # One-way actor LR reduction when policy entropy gets too low.
         if (
@@ -911,7 +863,6 @@ def main():
         critic_weight = loss_weights.get('critic', 0.25)
         entropy_coeff = loss_weights.get('entropy', 0.01)
         entropy_coeff_end = loss_weights.get('entropy_final', entropy_coeff)
-        aux_rewards_config = phase_config.get('auxiliary_rewards', {})
         lambda_gae = phase_config.get('lambda_gae', 0.95)
         advantage_clip = phase_config.get('advantage_clip', 3.0)
         actor_grad_clip = phase_config.get('actor_grad_clip', 10.0)
@@ -941,7 +892,7 @@ def main():
                           lambda_gae=lambda_gae,
                           loss_weights=(actor_weight, critic_weight), entropy_coeff=entropy_coeff,
                           entropy_coeff_end=entropy_coeff_end,
-                          checkpoint_freq=checkpoint_freq, aux_rewards_config=aux_rewards_config,
+                          checkpoint_freq=checkpoint_freq,
                           start_epoch=start_epoch, log_path=log_path, use_warmup=True,
                           advantage_clip=advantage_clip, actor_grad_clip=actor_grad_clip,
                           collapse_entropy_threshold=collapse_entropy_threshold,

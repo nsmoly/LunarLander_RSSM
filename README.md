@@ -134,7 +134,7 @@ python train_models.py --phase actor_critic --config config.yaml \
 | `--config` | `config.yaml` | Path to config file |
 | `--train_dataset` | `lunarlander_train_dataset.npz` | Training dataset path |
 
-Config: `horizon`, `past_horizon`, `future_horizon` (must satisfy P+F=H), `batch_size`, `lr`, `epochs`, `auxiliary_rewards`, etc.
+Config: `horizon`, `past_horizon`, `future_horizon` (must satisfy P+F=H), `batch_size`, `lr`, `epochs`, etc.
 
 ---
 

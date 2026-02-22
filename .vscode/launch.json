@@ -82,23 +82,6 @@
             "justMyCode": false
         },
         {
-            "name": "WorldModel Sim",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/worldmodel_sim.py",
-            "args": [
-                "--config", "config.yaml",
-                "--world_model", "world_model.pt",
-                "--val_dataset", "lunarlander_val_dataset.npz",
-                "--seed", "12345",
-                "--warmup_steps", "15",
-                "--fps", "30",
-                "--max_episode_steps", "500"
-            ],
-            "console": "integratedTerminal",
-            "justMyCode": false
-        },
-        {
             "name": "WorldModel Sim (pygame)",
             "type": "python",
             "request": "launch",

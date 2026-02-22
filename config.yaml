@@ -34,9 +34,6 @@ actor_critic:
     critic: 0.3
     entropy: 0.5   # Entropy start (early exploration)
     entropy_final: 0.35   # Slightly higher late exploration to reduce passive falling
-  auxiliary_rewards:
-    upright_pose_weight: 0.18
-    downward_speed_weight: 0.05
   advantage_clip: 0.9   # Slightly tighter actor update magnitude
   actor_grad_clip: 1.8 # Slightly tighter actor gradient clipping
   collapse_entropy_threshold: 0.35   # Stop earlier when entropy gets too low
