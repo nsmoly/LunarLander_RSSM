@@ -3,6 +3,11 @@ __pycache__/
 
 # Training/runtime artifacts
 checkpoints/
+checkpoints/**
+dataset/
+dataset/**
+datasets/
+datasets/**
 plots/
 train_actorcritic_logs*.txt
 train_worldmodel_logs*.txt

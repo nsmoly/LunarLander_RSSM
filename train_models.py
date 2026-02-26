@@ -65,7 +65,7 @@ def save_checkpoint_with_timestamp(model, model_name, epoch, directory=CHECKPOIN
 # -----------------------------------------------------------------------------
 class SequenceDataset(Dataset):
     """Samples sequences from real episodes for world model training."""
-    def __init__(self, path, sequence_length, action_dim, random_start=True):
+    def __init__(self, path, sequence_length, action_dim, random_start=True, dataset_seq_offset=20):
         data = np.load(path)
         self.obs = data["obs"].astype(np.float32)
         self.actions = data["actions"].astype(np.int64)
@@ -76,6 +76,7 @@ class SequenceDataset(Dataset):
         self.step_index = data["step_index"].astype(np.int64)
         self.sequence_length = int(sequence_length)
         self.random_start = bool(random_start)
+        self.dataset_seq_offset = max(1, int(dataset_seq_offset))
         self.obs_dim = self.obs.shape[1]
         self.action_dim = int(action_dim) # need to pass action_dim since we only store action IDs in the dataset
         if self.actions.size and self.actions.max() >= self.action_dim:
@@ -99,7 +100,7 @@ class SequenceDataset(Dataset):
             data_idxs = data_idxs[order]
             ep_pos = len(self.episode_indices)
             self.episode_indices.append(data_idxs)
-            for pos in range(len(data_idxs)):
+            for pos in range(0, len(data_idxs), self.dataset_seq_offset):
                 self.start_positions.append((ep_pos, pos))
 
     def __len__(self):
@@ -717,9 +718,22 @@ def main():
         log_path = os.path.join(".", "train_worldmodel_logs.txt")
 
         sequence_length = phase_config.get('sequence_length', 50)
+        dataset_seq_offset = phase_config.get('dataset_seq_offset', 10)
         action_dim = phase_config.get('action_dim', 4)
-        train_dataset = SequenceDataset(args.train_dataset, sequence_length, action_dim, random_start=True)
-        val_dataset = SequenceDataset(args.val_dataset, sequence_length, action_dim, random_start=False)
+        train_dataset = SequenceDataset(
+            args.train_dataset,
+            sequence_length,
+            action_dim,
+            random_start=True,
+            dataset_seq_offset=dataset_seq_offset,
+        )
+        val_dataset = SequenceDataset(
+            args.val_dataset,
+            sequence_length,
+            action_dim,
+            random_start=False,
+            dataset_seq_offset=dataset_seq_offset,
+        )
 
         batch_size = phase_config.get('batch_size', 64)
         train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
@@ -766,7 +780,18 @@ def main():
         kl_weight = loss_weights.get('kl', 1.0)
         done_weight = loss_weights.get('done', 0.5)
 
-        log_message(f"Training world model for {epochs} epochs with lr={lr}, beta_kl={beta_kl}, sequence_length={sequence_length}, seed={args.seed}...", log_path)
+        log_message(f"Train dataset file: {args.train_dataset}", log_path)
+        log_message(f"Validation dataset file: {args.val_dataset}", log_path)
+        log_message(f"Train dataset episodes: {len(train_dataset.episode_ids)}", log_path)
+        log_message(f"Train dataset samples/sequences: {len(train_dataset)}", log_path)
+        log_message(f"Validation dataset episodes: {len(val_dataset.episode_ids)}", log_path)
+        log_message(f"Validation dataset samples/sequences: {len(val_dataset)}", log_path)
+
+        log_message(
+            f"Training world model for {epochs} epochs with lr={lr}, beta_kl={beta_kl}, "
+            f"sequence_length={sequence_length}, dataset_seq_offset={dataset_seq_offset}, seed={args.seed}...",
+            log_path,
+        )
         log_message(
             f"Model capacity: latent_dim={latent_dim}, hidden_dim={hidden_dim}, "
             f"gru_num_layers={gru_num_layers}",
@@ -783,8 +808,8 @@ def main():
                          loss_weights=(recon_weight, reward_weight, kl_weight, done_weight),
                          log_path=log_path)
 
-        torch.save(world_model.state_dict(), "world_model.pt")
-        log_message("Final world model saved to world_model.pt", log_path)
+        #torch.save(world_model.state_dict(), "world_model.pt")
+        #log_message("Final world model saved to world_model.pt", log_path)
 
     elif args.phase == 'actor_critic':
         log_path = os.path.join(".", "train_actorcritic_logs.txt")
@@ -902,9 +927,9 @@ def main():
                           low_entropy_actor_lr_threshold=low_entropy_actor_lr_threshold,
                           reduced_actor_lr=reduced_actor_lr)
 
-        torch.save(actor.state_dict(), "actor.pt")
-        torch.save(critic.state_dict(), "critic.pt")
-        log_message("Final actor and critic saved to actor.pt and critic.pt", log_path)
+        #torch.save(actor.state_dict(), "actor.pt")
+        #torch.save(critic.state_dict(), "critic.pt")
+        #log_message("Final actor and critic saved to actor.pt and critic.pt", log_path)
 
 
 if __name__ == "__main__":

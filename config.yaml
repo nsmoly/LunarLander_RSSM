@@ -16,6 +16,7 @@ world_model:
   beta_kl: 0.5
   batch_size: 64
   sequence_length: 30
+  dataset_seq_offset: 5
   checkpoint_freq: 10  # Save checkpoint every 100 epochs
   
 actor_critic:
