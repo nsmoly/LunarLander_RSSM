@@ -425,8 +425,8 @@ def imagine_rollout(world_model, actor, start_obs, horizon=15):
     observations = []
 
     for t in range(horizon):
-        dist = actor(z)
-        a = dist.sample()
+        action_distr = actor(z)
+        a = action_distr.sample()
         a_onehot = torch.nn.functional.one_hot(a, num_classes=action_dim).float()
 
         h = world_model.rssm.update_hidden(h, z, a_onehot)
@@ -474,8 +474,8 @@ def imagine_rollout_with_warmup(world_model, actor, obs_past, actions_past, futu
     observations = []
 
     for t in range(future_horizon):
-        dist = actor(z)
-        a = dist.sample()
+        action_distr = actor(z)
+        a = action_distr.sample()
         a_onehot = torch.nn.functional.one_hot(a, num_classes=action_dim).float()
 
         h = world_model.rssm.update_hidden(h, z, a_onehot)
@@ -575,14 +575,14 @@ def train_actor_critic(world_model, actor, critic, dataloader,
                     adv[:, t] = gae
                 returns = adv + values
 
-            dist = actor(zs.reshape(-1, zs.size(-1)))
-            log_probs = dist.log_prob(imagined_actions.reshape(-1))
+            action_distr = actor(zs.reshape(-1, zs.size(-1)))
+            log_probs = action_distr.log_prob(imagined_actions.reshape(-1))
             adv_flat = adv.reshape(-1).detach()
             adv_flat = (adv_flat - adv_flat.mean()) / (adv_flat.std() + 1e-8)
             adv_flat = torch.clamp(adv_flat, -advantage_clip, advantage_clip)
 
             actor_loss = loss_weights[0] * (
-                -(log_probs * adv_flat).mean() - current_entropy_coeff * dist.entropy().mean()
+                -(log_probs * adv_flat).mean() - current_entropy_coeff * action_distr.entropy().mean()
             )
 
             value_pred = critic(zs.reshape(-1, zs.size(-1)))
@@ -602,8 +602,8 @@ def train_actor_critic(world_model, actor, critic, dataloader,
 
             imagined_reward_mean = imagined_rewards.mean().item()
             value_mae = torch.abs(value_pred - returns.reshape(-1).detach()).mean().item()
-            entropy = dist.entropy().mean().item()
-            max_action_prob = dist.probs.max(dim=-1).values.mean().item()
+            entropy = action_distr.entropy().mean().item()
+            max_action_prob = action_distr.probs.max(dim=-1).values.mean().item()
 
             total_actor_loss += actor_loss.item()
             total_critic_loss += critic_loss.item()
