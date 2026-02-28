@@ -228,7 +228,7 @@ def main():
     parser.add_argument("--temperature", type=float, default=1.0, help="Sampling temperature")
     parser.add_argument("--gamma", type=float, default=0.97, help="Planning discount")
     parser.add_argument("--reward_weight", type=float, default=0.2, help="Weight for predicted reward")
-    parser.add_argument("--done_penalty", type=float, default=2.0, help="Penalty for predicted done probability")
+    parser.add_argument("--done_penalty", type=float, default=2.5, help="Penalty for predicted done probability")
 
     parser.add_argument("--w_x", type=float, default=0.18, help="Base weight for |x|")
     parser.add_argument("--w_y", type=float, default=0.20, help="Weight for |y| (target y=0)")
@@ -272,12 +272,37 @@ def main():
         "Actions: 0=idle, 1=left side, 2=main, 3=right side"
     )
 
+    run_returns = []
+    run_action_counts = np.zeros(action_dim, dtype=np.int64)
+    run_planner_steps = 0
+    run_near_count = 0
+    run_near_abs_angle_sum = 0.0
+    run_near_down_speed_sum = 0.0
+    run_touchdown_abs_ang_vel = []
+
     stop_all = False
     for ep in range(1, args.episodes + 1):
         obs, _ = env.reset(seed=args.seed + ep)
         done = False
         ep_return = 0.0
         prev_action = 0
+        action_counts = np.zeros(action_dim, dtype=np.int64)
+        planner_steps = 0
+        planner_score_sum = 0.0
+        planner_step0_reward_sum = 0.0
+        planner_step0_cost_sum = 0.0
+
+        min_y = float("inf")
+        max_abs_angle = 0.0
+        max_down_speed = 0.0
+        max_abs_vx = 0.0
+
+        near_count = 0
+        near_abs_angle_sum = 0.0
+        near_down_speed_sum = 0.0
+        near_abs_vx_sum = 0.0
+
+        touchdown_snapshot = None
         h = world_model.rssm.init_hidden(batch_size=1, device=DEVICE)
         z = torch.zeros(1, world_model.rssm.latent_dim, device=DEVICE)
         t0 = time.perf_counter()
@@ -299,10 +324,37 @@ def main():
                 action, best_score, best_step0_reward, best_step0_cost = cem_plan(
                     world_model, h, z, action_dim, args
                 )
+            planner_steps += 1
+            planner_score_sum += float(best_score)
+            planner_step0_reward_sum += float(best_step0_reward)
+            planner_step0_cost_sum += float(best_step0_cost)
+            if 0 <= int(action) < action_dim:
+                action_counts[int(action)] += 1
 
             next_obs, reward, terminated, truncated, _ = env.step(action)
             done = bool(terminated or truncated)
             ep_return += float(reward)
+            if len(next_obs) >= 6:
+                x = float(next_obs[0])
+                y = float(next_obs[1])
+                vx = float(next_obs[2])
+                vy = float(next_obs[3])
+                angle = float(next_obs[4])
+                ang_vel = float(next_obs[5])
+
+                min_y = min(min_y, y)
+                max_abs_angle = max(max_abs_angle, abs(angle))
+                max_down_speed = max(max_down_speed, max(-vy, 0.0))
+                max_abs_vx = max(max_abs_vx, abs(vx))
+
+                if y < args.y_near:
+                    near_count += 1
+                    near_abs_angle_sum += abs(angle)
+                    near_down_speed_sum += max(-vy, 0.0)
+                    near_abs_vx_sum += abs(vx)
+
+                if done:
+                    touchdown_snapshot = (x, y, vx, vy, angle, ang_vel)
             obs = next_obs
             prev_action = action
 
@@ -326,8 +378,101 @@ def main():
             f"[Episode {ep}] return={ep_return:+.2f}, steps={step}, "
             f"done={done}, elapsed={time.perf_counter() - t0:.1f}s"
         )
+        if planner_steps > 0:
+            action_mix = " ".join(
+                f"{a}:{(100.0 * action_counts[a] / planner_steps):.1f}%"
+                for a in range(action_dim)
+            )
+            print(f"[Episode {ep}] action_mix {action_mix}")
+            print(
+                f"[Episode {ep}] planner_avg score={planner_score_sum / planner_steps:+.3f} "
+                f"step0_reward={planner_step0_reward_sum / planner_steps:+.3f} "
+                f"step0_cost={planner_step0_cost_sum / planner_steps:+.3f}"
+            )
+        if min_y != float("inf"):
+            print(
+                f"[Episode {ep}] extrema min_y={min_y:+.3f} "
+                f"max_abs_angle={max_abs_angle:.3f} "
+                f"max_down_speed={max_down_speed:.3f} "
+                f"max_abs_vx={max_abs_vx:.3f}"
+            )
+        if near_count > 0:
+            print(
+                f"[Episode {ep}] near_ground(y<{args.y_near:.2f}) "
+                f"avg_abs_angle={near_abs_angle_sum / near_count:.3f} "
+                f"avg_down_speed={near_down_speed_sum / near_count:.3f} "
+                f"avg_abs_vx={near_abs_vx_sum / near_count:.3f}"
+            )
+        if touchdown_snapshot is not None:
+            tx, ty, tvx, tvy, tangle, tang_vel = touchdown_snapshot
+            print(
+                f"[Episode {ep}] touchdown "
+                f"x={tx:+.3f} y={ty:+.3f} vx={tvx:+.3f} vy={tvy:+.3f} "
+                f"angle={tangle:+.3f} ang_vel={tang_vel:+.3f}"
+            )
+
+        run_returns.append(ep_return)
+        run_action_counts += action_counts
+        run_planner_steps += planner_steps
+        run_near_count += near_count
+        run_near_abs_angle_sum += near_abs_angle_sum
+        run_near_down_speed_sum += near_down_speed_sum
+        if touchdown_snapshot is not None:
+            run_touchdown_abs_ang_vel.append(abs(touchdown_snapshot[5]))
+
         if stop_all:
             break
+
+    if run_returns:
+        mean_return = float(np.mean(run_returns))
+        worst_return = float(np.min(run_returns))
+        main_mix = (100.0 * run_action_counts[2] / run_planner_steps) if run_planner_steps > 0 else 0.0
+        near_avg_abs_angle = (run_near_abs_angle_sum / run_near_count) if run_near_count > 0 else float("nan")
+        near_avg_down_speed = (run_near_down_speed_sum / run_near_count) if run_near_count > 0 else float("nan")
+        touchdown_median_abs_ang_vel = (
+            float(np.median(np.array(run_touchdown_abs_ang_vel, dtype=np.float64)))
+            if run_touchdown_abs_ang_vel
+            else float("nan")
+        )
+        touchdown_p90_abs_ang_vel = (
+            float(np.percentile(np.array(run_touchdown_abs_ang_vel, dtype=np.float64), 90))
+            if run_touchdown_abs_ang_vel
+            else float("nan")
+        )
+
+        checks = {
+            "mean_return >= -65": mean_return >= -65.0,
+            "worst_return >= -120": worst_return >= -120.0,
+            "near_ground avg_down_speed <= 0.75": near_avg_down_speed <= 0.75 if not np.isnan(near_avg_down_speed) else False,
+            "near_ground avg_abs_angle <= 0.35": near_avg_abs_angle <= 0.35 if not np.isnan(near_avg_abs_angle) else False,
+            "touchdown median abs(ang_vel) <= 2.0": (
+                touchdown_median_abs_ang_vel <= 2.0 if not np.isnan(touchdown_median_abs_ang_vel) else False
+            ),
+            "touchdown p90 abs(ang_vel) <= 3.0": (
+                touchdown_p90_abs_ang_vel <= 3.0 if not np.isnan(touchdown_p90_abs_ang_vel) else False
+            ),
+            "main action mix in [35%, 55%]": 35.0 <= main_mix <= 55.0,
+        }
+        passed = int(sum(1 for ok in checks.values() if ok))
+        required_core = checks["near_ground avg_down_speed <= 0.75"] and checks["near_ground avg_abs_angle <= 0.35"]
+        if passed >= 5 and required_core:
+            verdict = "PASS"
+        elif passed <= 3 or worst_return < -130.0:
+            verdict = "FAIL"
+        else:
+            verdict = "BORDERLINE"
+
+        print("[Run] ===== Checklist Scorecard =====")
+        print(
+            f"[Run] mean_return={mean_return:+.2f} worst_return={worst_return:+.2f} "
+            f"main_action_mix={main_mix:.1f}% near_avg_abs_angle={near_avg_abs_angle:.3f} "
+            f"near_avg_down_speed={near_avg_down_speed:.3f} "
+            f"touchdown_median_abs_ang_vel={touchdown_median_abs_ang_vel:.3f} "
+            f"touchdown_p90_abs_ang_vel={touchdown_p90_abs_ang_vel:.3f}"
+        )
+        for name, ok in checks.items():
+            print(f"[Run] {'OK ' if ok else 'BAD'} {name}")
+        print(f"[Run] verdict={verdict} ({passed}/{len(checks)} checks passed)")
 
     env.close()
     if pygame is not None and screen is not None:
