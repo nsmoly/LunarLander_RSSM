@@ -78,13 +78,22 @@ def observation_cost(obs_pred, args):
     vy = obs_pred[:, 3]
     angle = obs_pred[:, 4]
     ang_vel = obs_pred[:, 5]
+
+    # 0 far from ground, 1 near ground.
+    near = torch.sigmoid((args.y_near - y) / max(args.y_near_temp, 1e-6))
+    # Allow faster descent higher up and require softer descent near touchdown.
+    vy_allowed = args.vy_allowed_far * (1.0 - near) + args.vy_allowed_near * near
+    down_excess = torch.relu((-vy) - vy_allowed)
+
     cost = (
         args.w_x * torch.abs(x)
+        + args.w_y * torch.abs(y)
         + args.w_vx * torch.abs(vx)
-        + args.w_vy_down * torch.relu(-vy)
+        + args.w_vy_down * down_excess
         + args.w_angle * torch.abs(angle)
+        + args.w_angle_near * near * torch.abs(angle)
         + args.w_ang_vel * torch.abs(ang_vel)
-        + args.w_low_y * torch.relu(args.y_target - y)
+        + args.w_ang_vel_near * near * torch.abs(ang_vel)
     )
     return cost
 
@@ -221,13 +230,18 @@ def main():
     parser.add_argument("--reward_weight", type=float, default=0.2, help="Weight for predicted reward")
     parser.add_argument("--done_penalty", type=float, default=2.0, help="Penalty for predicted done probability")
 
-    parser.add_argument("--w_x", type=float, default=0.15, help="Weight for |x|")
-    parser.add_argument("--w_vx", type=float, default=0.60, help="Weight for |vx|")
-    parser.add_argument("--w_vy_down", type=float, default=0.85, help="Weight for downward speed")
-    parser.add_argument("--w_angle", type=float, default=1.10, help="Weight for |angle|")
-    parser.add_argument("--w_ang_vel", type=float, default=0.55, help="Weight for |angular velocity|")
-    parser.add_argument("--w_low_y", type=float, default=0.40, help="Penalty for being below y_target")
-    parser.add_argument("--y_target", type=float, default=0.20, help="Target minimum y")
+    parser.add_argument("--w_x", type=float, default=0.18, help="Base weight for |x|")
+    parser.add_argument("--w_y", type=float, default=0.20, help="Weight for |y| (target y=0)")
+    parser.add_argument("--w_vx", type=float, default=0.70, help="Weight for |vx|")
+    parser.add_argument("--w_vy_down", type=float, default=1.90, help="Weight for excess downward speed")
+    parser.add_argument("--w_angle", type=float, default=1.20, help="Base weight for |angle|")
+    parser.add_argument("--w_angle_near", type=float, default=1.20, help="Extra |angle| weight near ground")
+    parser.add_argument("--w_ang_vel", type=float, default=0.70, help="Base weight for |angular velocity|")
+    parser.add_argument("--w_ang_vel_near", type=float, default=0.90, help="Extra |angular velocity| weight near ground")
+    parser.add_argument("--y_near", type=float, default=0.35, help="Near-ground activation threshold")
+    parser.add_argument("--y_near_temp", type=float, default=0.08, help="Near-ground gate smoothness")
+    parser.add_argument("--vy_allowed_far", type=float, default=0.60, help="Allowed downward speed far from ground")
+    parser.add_argument("--vy_allowed_near", type=float, default=0.12, help="Allowed downward speed near ground")
     args = parser.parse_args()
 
     if args.horizon < 1:
@@ -236,6 +250,8 @@ def main():
         raise ValueError("population must be >= 2")
     if args.elites < 1 or args.elites > args.population:
         raise ValueError("elites must be in [1, population]")
+    if args.y_near_temp <= 0.0:
+        raise ValueError("y_near_temp must be > 0")
 
     set_seed(args.seed)
 
