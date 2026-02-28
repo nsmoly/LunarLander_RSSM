@@ -106,7 +106,8 @@ def evaluate_action_sequences(world_model, h0, z0, action_sequences, action_dim,
         z = mean_prior
         obs_pred = world_model.reconstruct_obs(h, z)
         reward_pred = world_model.predict_reward(h, z)
-        step_score = args.reward_weight * reward_pred - observation_cost(obs_pred, args)
+        obs_cost = observation_cost(obs_pred, args)
+        step_score = args.reward_weight * reward_pred - obs_cost
         if args.done_penalty > 0.0 and hasattr(world_model, "predict_done_logits"):
             done_prob = torch.sigmoid(world_model.predict_done_logits(h, z))
             step_score = step_score - args.done_penalty * done_prob
@@ -143,7 +144,19 @@ def cem_plan(world_model, h0, z0, action_dim, args):
         best_sequence = torch.zeros(args.horizon, device=DEVICE, dtype=torch.long)
         best_score = float("-inf")
     selected_action = int(best_sequence[0].item())
-    return selected_action, best_score
+
+    # Compute diagnostics for the first step of the best selected rollout.
+    action0 = best_sequence[0].view(1)
+    action0_oh = F.one_hot(action0, num_classes=action_dim).float()
+    h1 = world_model.rssm.update_hidden(h0, z0, action0_oh)
+    z1, _ = world_model.rssm.prior(h1)
+    obs1 = world_model.reconstruct_obs(h1, z1)
+    reward1 = world_model.predict_reward(h1, z1)
+    cost1 = observation_cost(obs1, args)
+    best_step0_reward = float((args.reward_weight * reward1).item())
+    best_step0_cost = float(cost1.item())
+
+    return selected_action, best_score, best_step0_reward, best_step0_cost
 
 
 
@@ -267,7 +280,9 @@ def main():
             ).float()
             with torch.no_grad():
                 h, z, _, _, _, _ = world_model.rssm.step(h, z, prev_action_oh, obs_t)
-                action, best_score = cem_plan(world_model, h, z, action_dim, args)
+                action, best_score, best_step0_reward, best_step0_cost = cem_plan(
+                    world_model, h, z, action_dim, args
+                )
 
             next_obs, reward, terminated, truncated, _ = env.step(action)
             done = bool(terminated or truncated)
@@ -282,6 +297,7 @@ def main():
                 f"Episode {ep}/{args.episodes} Step {step}",
                 f"Real reward {reward:+.3f}  Episode return {ep_return:+.2f}",
                 f"CEM best score {best_score:+.3f}  Chosen action {action}",
+                f"Best seq step0: reward={best_step0_reward:+.3f} cost={best_step0_cost:+.3f}",
                 f"FPS cap {lunar_lander_module.FPS}  Measured {fps_est:.1f}",
             ]
             draw_frame(screen, font, frame, overlay, render_enabled)

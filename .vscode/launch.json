@@ -109,7 +109,7 @@
             "args": [
                 "--config", "config.yaml",
                 "--world_model", "world_model.pt",
-                "--episodes", "10",
+                "--episodes", "20",
                 "--seed", "12345",
                 "--render",
                 "--horizon", "15",
