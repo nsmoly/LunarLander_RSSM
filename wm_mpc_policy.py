@@ -274,7 +274,9 @@ def main():
 
     run_returns = []
     run_action_counts = np.zeros(action_dim, dtype=np.int64)
+    run_action_counts_air = np.zeros(action_dim, dtype=np.int64)
     run_planner_steps = 0
+    run_air_steps = 0
     run_near_count = 0
     run_near_abs_angle_sum = 0.0
     run_near_down_speed_sum = 0.0
@@ -287,7 +289,9 @@ def main():
         ep_return = 0.0
         prev_action = 0
         action_counts = np.zeros(action_dim, dtype=np.int64)
+        action_counts_air = np.zeros(action_dim, dtype=np.int64)
         planner_steps = 0
+        air_steps = 0
         planner_score_sum = 0.0
         planner_step0_reward_sum = 0.0
         planner_step0_cost_sum = 0.0
@@ -353,6 +357,11 @@ def main():
                     near_down_speed_sum += max(-vy, 0.0)
                     near_abs_vx_sum += abs(vx)
 
+                # Count action mix in the air (exclude on the ground actions)
+                if abs(vy) > 0.02 and (y > 0.0) and 0 <= int(action) < action_dim:
+                    action_counts_air[int(action)] += 1
+                    air_steps += 1
+
                 if done:
                     touchdown_snapshot = (x, y, vx, vy, angle, ang_vel)
             obs = next_obs
@@ -384,6 +393,12 @@ def main():
                 for a in range(action_dim)
             )
             print(f"[Episode {ep}] action_mix {action_mix}")
+            if air_steps > 0:
+                action_mix_air = " ".join(
+                    f"{a}:{(100.0 * action_counts_air[a] / air_steps):.1f}%"
+                    for a in range(action_dim)
+                )
+                print(f"[Episode {ep}] action_mix_air {action_mix_air}")
             print(
                 f"[Episode {ep}] planner_avg score={planner_score_sum / planner_steps:+.3f} "
                 f"step0_reward={planner_step0_reward_sum / planner_steps:+.3f} "
@@ -413,7 +428,9 @@ def main():
 
         run_returns.append(ep_return)
         run_action_counts += action_counts
+        run_action_counts_air += action_counts_air
         run_planner_steps += planner_steps
+        run_air_steps += air_steps
         run_near_count += near_count
         run_near_abs_angle_sum += near_abs_angle_sum
         run_near_down_speed_sum += near_down_speed_sum
@@ -427,6 +444,7 @@ def main():
         mean_return = float(np.mean(run_returns))
         worst_return = float(np.min(run_returns))
         main_mix = (100.0 * run_action_counts[2] / run_planner_steps) if run_planner_steps > 0 else 0.0
+        main_mix_air = (100.0 * run_action_counts_air[2] / run_air_steps) if run_air_steps > 0 else 0.0
         near_avg_abs_angle = (run_near_abs_angle_sum / run_near_count) if run_near_count > 0 else float("nan")
         near_avg_down_speed = (run_near_down_speed_sum / run_near_count) if run_near_count > 0 else float("nan")
         touchdown_median_abs_ang_vel = (
@@ -451,7 +469,7 @@ def main():
             "touchdown p90 abs(ang_vel) <= 3.0": (
                 touchdown_p90_abs_ang_vel <= 3.0 if not np.isnan(touchdown_p90_abs_ang_vel) else False
             ),
-            "main action mix in [35%, 55%]": 35.0 <= main_mix <= 55.0,
+            "main action mix in [35%, 55%] (air only)": 35.0 <= main_mix_air <= 55.0,
         }
         passed = int(sum(1 for ok in checks.values() if ok))
         required_core = checks["near_ground avg_down_speed <= 0.75"] and checks["near_ground avg_abs_angle <= 0.35"]
@@ -465,7 +483,8 @@ def main():
         print("[Run] ===== Checklist Scorecard =====")
         print(
             f"[Run] mean_return={mean_return:+.2f} worst_return={worst_return:+.2f} "
-            f"main_action_mix={main_mix:.1f}% near_avg_abs_angle={near_avg_abs_angle:.3f} "
+            f"main_action_mix={main_mix:.1f}% main_action_mix_air={main_mix_air:.1f}% "
+            f"near_avg_abs_angle={near_avg_abs_angle:.3f} "
             f"near_avg_down_speed={near_avg_down_speed:.3f} "
             f"touchdown_median_abs_ang_vel={touchdown_median_abs_ang_vel:.3f} "
             f"touchdown_p90_abs_ang_vel={touchdown_p90_abs_ang_vel:.3f}"
