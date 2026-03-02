@@ -2,8 +2,9 @@
 world_model:
   action_dim: 4
   capacity:
-    latent_dim: 64
-    hidden_dim: 384
+    latent_dim: 16
+    hidden_dim: 256
+    mlp_hidden_dim: 256
     gru_num_layers: 1  # Number of stacked GRU layers in RSSM
   loss_weights:
     reconstruction: 1.0
@@ -27,8 +28,9 @@ actor_critic:
   future_horizon: 15  # F: imagination rollout steps
   lambda_gae: 0.95   # GAE lambda: 0=1-step TD, 1=full returns, 0.95=typical hybrid
   capacity:
-    latent_dim: 64
-    hidden_dim: 384
+    latent_dim: 16
+    hidden_dim: 256
+    mlp_hidden_dim: 256
     gru_num_layers: 1  # Must match world_model capacity for loading world_model.pt
   loss_weights:
     actor: 1.0

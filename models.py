@@ -10,23 +10,33 @@ import torch.nn as nn
 
 # Recurrent State Space Model (RSSM) for the latent world model
 class RSSM(nn.Module):
-    def __init__(self, obs_dim, action_dim, latent_dim=64, hidden_dim=128, gru_num_layers=1):
+    def __init__(
+        self,
+        obs_dim,
+        action_dim,
+        latent_dim=16,
+        hidden_dim=256,
+        gru_num_layers=1,
+        mlp_hidden_dim=None,
+    ):
         super().__init__()
         self.obs_dim = obs_dim
         self.action_dim = action_dim
         self.latent_dim = latent_dim
+        # Keep hidden_dim as the deterministic state size (h) for compatibility.
         self.hidden_dim = hidden_dim
+        self.mlp_hidden_dim = int(mlp_hidden_dim) if mlp_hidden_dim is not None else int(hidden_dim)
         self.gru_num_layers = int(gru_num_layers)
         if self.gru_num_layers < 1:
             raise ValueError(f"gru_num_layers must be >= 1, got {self.gru_num_layers}")
 
         self.obs_encoder = nn.Sequential(
-            nn.Linear(obs_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
+            nn.Linear(obs_dim, self.mlp_hidden_dim),
+            nn.LayerNorm(self.mlp_hidden_dim),
+            nn.SiLU(),
+            nn.Linear(self.mlp_hidden_dim, self.mlp_hidden_dim),
+            nn.LayerNorm(self.mlp_hidden_dim),
+            nn.SiLU(),
         )
 
         if self.gru_num_layers == 1:
@@ -39,19 +49,23 @@ class RSSM(nn.Module):
             )
 
         self.prior_net = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, 2 * latent_dim),
+            nn.Linear(hidden_dim, self.mlp_hidden_dim),
+            nn.LayerNorm(self.mlp_hidden_dim),
+            nn.SiLU(),
+            nn.Linear(self.mlp_hidden_dim, self.mlp_hidden_dim),
+            nn.LayerNorm(self.mlp_hidden_dim),
+            nn.SiLU(),
+            nn.Linear(self.mlp_hidden_dim, 2 * latent_dim),
         )
 
         self.post_net = nn.Sequential(
-            nn.Linear(hidden_dim + hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, 2 * latent_dim),
+            nn.Linear(hidden_dim + self.mlp_hidden_dim, self.mlp_hidden_dim),
+            nn.LayerNorm(self.mlp_hidden_dim),
+            nn.SiLU(),
+            nn.Linear(self.mlp_hidden_dim, self.mlp_hidden_dim),
+            nn.LayerNorm(self.mlp_hidden_dim),
+            nn.SiLU(),
+            nn.Linear(self.mlp_hidden_dim, 2 * latent_dim),
         )
 
     def init_hidden(self, batch_size, device):
@@ -120,43 +134,74 @@ class RSSM(nn.Module):
 
 
 class WorldModel(nn.Module):
-    def __init__(self, obs_dim, action_dim, latent_dim=64, hidden_dim=128, gru_num_layers=1):
+    def __init__(
+        self,
+        obs_dim,
+        action_dim,
+        latent_dim=16,
+        hidden_dim=256,
+        gru_num_layers=1,
+        mlp_hidden_dim=None,
+    ):
         super().__init__()
-        
-        self.rssm = RSSM(obs_dim, action_dim, latent_dim, hidden_dim, gru_num_layers=gru_num_layers)
-        
-        self.obs_decoder = nn.Sequential(
-            nn.Linear(latent_dim + hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, obs_dim),
+        self.obs_dim = obs_dim
+        self.physics_dim = 6
+        self.contact_dim = 2
+        self.mlp_hidden_dim = int(mlp_hidden_dim) if mlp_hidden_dim is not None else int(hidden_dim)
+
+        self.rssm = RSSM(
+            obs_dim,
+            action_dim,
+            latent_dim,
+            hidden_dim,
+            gru_num_layers=gru_num_layers,
+            mlp_hidden_dim=self.mlp_hidden_dim,
         )
+
+        dec_in_dim = latent_dim + hidden_dim
+        self.decoder_backbone = nn.Sequential(
+            nn.Linear(dec_in_dim, self.mlp_hidden_dim),
+            nn.LayerNorm(self.mlp_hidden_dim),
+            nn.SiLU(),
+            nn.Linear(self.mlp_hidden_dim, self.mlp_hidden_dim),
+            nn.LayerNorm(self.mlp_hidden_dim),
+            nn.SiLU(),
+        )
+        self.physics_head = nn.Linear(self.mlp_hidden_dim, self.physics_dim)
+        self.contact_head = nn.Linear(self.mlp_hidden_dim, self.contact_dim)
+        self.done_head = nn.Linear(self.mlp_hidden_dim, 1)
 
         self.reward_head = nn.Sequential(
-            nn.Linear(latent_dim + hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, 1),
+            nn.Linear(dec_in_dim, self.mlp_hidden_dim),
+            nn.LayerNorm(self.mlp_hidden_dim),
+            nn.SiLU(),
+            nn.Linear(self.mlp_hidden_dim, self.mlp_hidden_dim),
+            nn.LayerNorm(self.mlp_hidden_dim),
+            nn.SiLU(),
+            nn.Linear(self.mlp_hidden_dim, 1),
         )
 
-        self.done_head = nn.Sequential(
-            nn.Linear(latent_dim + hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, 1),
-        )
+    def decode_heads(self, h, z):
+        x = torch.cat([self.rssm.top_hidden(h), z], dim=-1)
+        feat = self.decoder_backbone(x)
+        physics = self.physics_head(feat)      # Linear output
+        contact_logits = self.contact_head(feat)  # BCE-with-logits target
+        done_logits = self.done_head(feat)     # BCE-with-logits target
+        return physics, contact_logits, done_logits
 
     def reconstruct_obs(self, h, z):
-        return self.obs_decoder(torch.cat([self.rssm.top_hidden(h), z], dim=-1))
+        # Keep a compatibility path that returns 8-D obs with contact probabilities.
+        physics, contact_logits, _ = self.decode_heads(h, z)
+        contact_probs = torch.sigmoid(contact_logits)
+        return torch.cat([physics, contact_probs], dim=-1)
 
     def predict_reward(self, h, z):
         return self.reward_head(torch.cat([self.rssm.top_hidden(h), z], dim=-1)).squeeze(-1)
 
     def predict_done_logits(self, h, z):
-        return self.done_head(torch.cat([self.rssm.top_hidden(h), z], dim=-1)).squeeze(-1)
+        _, _, done_logits = self.decode_heads(h, z)
+        return done_logits.squeeze(-1)
+
 
 class Actor(nn.Module):
     def __init__(self, latent_dim, action_dim, hidden_dim=128):

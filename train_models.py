@@ -240,11 +240,17 @@ def train_world_model(world_model, train_dataloader, val_dataloader, epochs=10, 
                 mean_post, logstd_post = world_model.rssm.posterior(h, obs_seq[:, t])
                 z_t = world_model.rssm.sample_latent(mean_post, logstd_post)
 
-                obs_pred = world_model.reconstruct_obs(h, z_t)
+                physics_pred, contact_logits, done_logits_2d = world_model.decode_heads(h, z_t)
                 reward_pred = world_model.predict_reward(h, z_t)
-                done_logits = world_model.predict_done_logits(h, z_t)
+                done_logits = done_logits_2d.squeeze(-1)
 
-                recon_loss = (obs_pred - obs_seq[:, t]).pow(2).sum(-1)
+                physics_tgt = obs_seq[:, t, :6]
+                contact_tgt = obs_seq[:, t, 6:8]
+                physics_loss = (physics_pred - physics_tgt).pow(2).sum(-1)
+                contact_loss = F.binary_cross_entropy_with_logits(
+                    contact_logits, contact_tgt, reduction="none"
+                ).sum(-1)
+                recon_loss = physics_loss + contact_loss
                 reward_loss = (reward_pred - rewards_seq[:, t]).pow(2)
                 done_loss = F.binary_cross_entropy_with_logits(done_logits, dones_seq[:, t], reduction="none")
                 kl = kl_divergence(mean_post, logstd_post, mean_prior, logstd_prior)
@@ -330,10 +336,17 @@ def validate_world_model(world_model, val_dataloader, beta_kl=1.0, loss_weights=
                 z_t = world_model.rssm.sample_latent(mean_post, logstd_post)
 
                 obs_pred = world_model.reconstruct_obs(h, z_t)
+                physics_pred, contact_logits, done_logits_2d = world_model.decode_heads(h, z_t)
                 reward_pred = world_model.predict_reward(h, z_t)
-                done_logits = world_model.predict_done_logits(h, z_t)
+                done_logits = done_logits_2d.squeeze(-1)
 
-                recon_loss = (obs_pred - obs_seq[:, t]).pow(2).sum(-1)
+                physics_tgt = obs_seq[:, t, :6]
+                contact_tgt = obs_seq[:, t, 6:8]
+                physics_loss = (physics_pred - physics_tgt).pow(2).sum(-1)
+                contact_loss = F.binary_cross_entropy_with_logits(
+                    contact_logits, contact_tgt, reduction="none"
+                ).sum(-1)
+                recon_loss = physics_loss + contact_loss
                 reward_loss = (reward_pred - rewards_seq[:, t]).pow(2)
                 done_loss = F.binary_cross_entropy_with_logits(done_logits, dones_seq[:, t], reduction="none")
                 kl = kl_divergence(mean_post, logstd_post, mean_prior, logstd_prior)
@@ -742,8 +755,9 @@ def main():
 
         obs_dim = train_dataset.obs_dim
         capacity = phase_config.get('capacity', {})
-        latent_dim = capacity.get('latent_dim', 64)
-        hidden_dim = capacity.get('hidden_dim', 128)
+        latent_dim = capacity.get('latent_dim', 16)
+        hidden_dim = capacity.get('hidden_dim', 256)
+        mlp_hidden_dim = capacity.get('mlp_hidden_dim', hidden_dim)
         gru_num_layers = int(capacity.get('gru_num_layers', 1))
 
         world_model = WorldModel(
@@ -752,6 +766,7 @@ def main():
             latent_dim=latent_dim,
             hidden_dim=hidden_dim,
             gru_num_layers=gru_num_layers,
+            mlp_hidden_dim=mlp_hidden_dim,
         ).to(DEVICE)
 
         latest_checkpoint = get_latest_checkpoint("world_model")
@@ -794,7 +809,7 @@ def main():
         )
         log_message(
             f"Model capacity: latent_dim={latent_dim}, hidden_dim={hidden_dim}, "
-            f"gru_num_layers={gru_num_layers}",
+            f"mlp_hidden_dim={mlp_hidden_dim}, gru_num_layers={gru_num_layers}",
             log_path,
         )
         log_message(
@@ -836,8 +851,9 @@ def main():
 
         obs_dim = dataset.obs_dim
         capacity = phase_config.get('capacity', {})
-        latent_dim = capacity.get('latent_dim', 64)
-        hidden_dim = capacity.get('hidden_dim', 128)
+        latent_dim = capacity.get('latent_dim', 16)
+        hidden_dim = capacity.get('hidden_dim', 256)
+        mlp_hidden_dim = capacity.get('mlp_hidden_dim', hidden_dim)
         gru_num_layers = int(capacity.get('gru_num_layers', 1))
 
         world_model = WorldModel(
@@ -846,6 +862,7 @@ def main():
             latent_dim=latent_dim,
             hidden_dim=hidden_dim,
             gru_num_layers=gru_num_layers,
+            mlp_hidden_dim=mlp_hidden_dim,
         ).to(DEVICE)
         if os.path.exists("world_model.pt"):
             world_model.load_state_dict(torch.load("world_model.pt", map_location=DEVICE))
@@ -907,7 +924,7 @@ def main():
         )
         log_message(
             f"Model capacity: latent_dim={latent_dim}, hidden_dim={hidden_dim}, "
-            f"gru_num_layers={gru_num_layers}",
+            f"mlp_hidden_dim={mlp_hidden_dim}, gru_num_layers={gru_num_layers}",
             log_path,
         )
         log_message(f"Dataset: {len(dataset)} valid (episode, start) positions", log_path)

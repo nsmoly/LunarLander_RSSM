@@ -212,3 +212,50 @@ python test_worldmodel.py --mode open --max_episodes 2 --plot_dir plots
 python train_models.py --phase actor_critic --train_dataset lunarlander_train_dataset.npz
 python test_policy.py
 ```
+
+---
+
+## Release Notes for V3 Version of WorldModel/RSSM in this Repo
+
+This release introduced a focused world-model refactor that significantly improved closed-loop MPC behavior in `wm_mpc_policy.py`, especially near touchdown.
+
+### What changed
+
+- **Decoder redesign to multi-head outputs**:
+  - Shared decoder backbone from `[h, z]`
+  - Physics head (6 continuous dims: `x, y, vx, vy, angle, ang_vel`)
+  - Contact head (2 binary dims: leg contacts)
+  - Done head (1 binary dim)
+- **Loss redesign to match output types**:
+  - Physics: MSE
+  - Contact: BCE-with-logits
+  - Done: BCE-with-logits
+  - (plus existing reward and KL terms)
+- **Model capacity/activation updates**:
+  - `latent_dim=16`, `hidden_dim=256`, `mlp_hidden_dim=256`
+  - `Linear -> LayerNorm -> SiLU` in all key world-model MLP blocks
+- **Posterior input decision finalized**:
+  - Posterior uses `obs_t` only, while `done` is a training target (predicted).
+
+### Why these changes mattered
+
+- The main gain came from **separating continuous and binary prediction heads/losses**, which reduced blurry terminal/contact dynamics and improved landing quality under MPC optimizer.
+- Capacity changes (reduced capacity) and normalization (LinearNorm) / activation (SiLU) changes further improved optimization stability, but the decoder/loss split was probably the biggest contributor. The training now converges to a good working world model by epoch 10. No dataset expansion was needed.
+
+### Checkpoint selection notes
+
+- In training logs, the most informative metrics for MPC checkpoint ranking were:
+  - **validation loss (`val_loss`)**
+  - **reward RMSE (`reward_rmse`)**
+- Metrics like best late-stage observation RMSE alone were less predictive of MPC closed-loop quality.
+MAE metrics were not that informative since they don't account for outliers as well as RMSE metrics.
+
+### Final world_model.pt checkpoint currently used
+
+- **Selected checkpoint: epoch 10**
+- This was chosen after direct WM-MPC evaluation across multiple seeds/checkpoints.
+- Checkpoints were tested directly via `wm_mpc_policy.py` (20 episodes per run, fixed planner/cost settings, varying world-model checkpoints/seeds).
+- Best observed run for the selected checkpoint:
+  - **Epoch 10, seed 12345**
+  - `mean_return=+96.17`, `worst_return=-87.50`
+  - Scorecard: **7/7 PASS**
