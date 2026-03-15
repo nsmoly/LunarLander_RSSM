@@ -1,4 +1,4 @@
-# Configuration file for Dreamer training parameters
+# Configuration file with training parameters
 world_model:
   action_dim: 4
   capacity:
@@ -22,10 +22,10 @@ world_model:
   
 actor_critic:
   action_dim: 4
-  # Horizon: past_horizon (warm-up) + future_horizon (imagination) = horizon. Must satisfy P+F=H.
-  horizon: 20
-  past_horizon: 5    # P: warm-up steps with real (obs, action)
-  future_horizon: 15  # F: imagination rollout steps
+  sequence_length: 5
+  dataset_seq_offset: 5   # Stride between start positions to reduce overlap
+  warmup_steps: 5         # Real observation/action steps to condition RSSM
+  imagination_steps: 15   # Latent rollout steps after warmup
   lambda_gae: 0.95   # GAE lambda: 0=1-step TD, 1=full returns, 0.95=typical hybrid
   capacity:
     latent_dim: 16
@@ -36,17 +36,17 @@ actor_critic:
     actor: 1.0
     critic: 0.3
     entropy: 0.5   # Entropy start (early exploration)
-    entropy_final: 0.35   # Slightly higher late exploration to reduce passive falling
-  advantage_clip: 0.9   # Slightly tighter actor update magnitude
-  actor_grad_clip: 1.8 # Slightly tighter actor gradient clipping
-  collapse_entropy_threshold: 0.35   # Stop earlier when entropy gets too low
-  collapse_actor_grad_threshold: 0.002  # Stop earlier if actor gradients fade
-  collapse_max_action_prob_threshold: 0.96  # Detect near-single-action policy earlier
-  collapse_patience_epochs: 2  # Fewer bad epochs before stop
-  low_entropy_actor_lr_threshold: 0.80  # Delay LR drop to avoid early policy passivity
-  reduced_actor_lr: 0.000008  # One-way LR drop before full collapse
-  epochs: 230
-  lr: 0.000010   # Lower base LR for better late-epoch stability
-  batch_size: 64
-  checkpoint_freq: 10  # Save checkpoint every 10 epochs
+    entropy_final: 0.15   # Lower floor so entropy can settle naturally
+  advantage_clip: 0.9
+  actor_grad_clip: 1.8
+  collapse_entropy_threshold: 0.10   # Only stop if entropy is truly collapsed
+  collapse_actor_grad_threshold: 0.002  # Stop if actor gradients fade
+  collapse_max_action_prob_threshold: 0.96  # Detect near-single-action policy
+  collapse_patience_epochs: 5  # More room to recover before stopping
+  low_entropy_actor_lr_threshold: 0.25  # Only reduce LR when entropy is genuinely low
+  reduced_actor_lr: 0.000005  # One-way LR drop before full collapse
+  epochs: 1000
+  lr: 0.00003   # Higher starting LR for fresh training
+  batch_size: 256
+  checkpoint_freq: 50  # Save checkpoint every 50 epochs
   

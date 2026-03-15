@@ -11,15 +11,16 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def load_config(config_path):
     if not os.path.exists(config_path):
-        return 64, 128, 1, 4
+        return 64, 128, 128, 1, 4
     with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f) or {}
     capacity = config.get("world_model", {}).get("capacity", {})
     latent_dim = int(capacity.get("latent_dim", 64))
     hidden_dim = int(capacity.get("hidden_dim", 128))
+    mlp_hidden_dim = int(capacity.get("mlp_hidden_dim", hidden_dim))
     gru_num_layers = int(capacity.get("gru_num_layers", 1))
     action_dim = int(config.get("world_model", {}).get("action_dim", 4))
-    return latent_dim, hidden_dim, gru_num_layers, action_dim
+    return latent_dim, hidden_dim, mlp_hidden_dim, gru_num_layers, action_dim
 
 
 def load_episodes(dataset_path):
@@ -368,7 +369,7 @@ def main():
     rng = np.random.default_rng(args.seed)
     picks = rng.choice(len(episodes), size=min(args.max_episodes, len(episodes)), replace=False)
 
-    latent_dim, hidden_dim, gru_num_layers, action_dim = load_config(args.config)
+    latent_dim, hidden_dim, mlp_hidden_dim, gru_num_layers, action_dim = load_config(args.config)
     obs_dim = episodes[0]["obs"].shape[1]
     world_model = WorldModel(
         obs_dim,
@@ -376,6 +377,7 @@ def main():
         latent_dim=latent_dim,
         hidden_dim=hidden_dim,
         gru_num_layers=gru_num_layers,
+        mlp_hidden_dim=mlp_hidden_dim,
     ).to(DEVICE)
     load_checkpoint(world_model, args.checkpoint)
     world_model.eval()
