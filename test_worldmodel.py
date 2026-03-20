@@ -1,3 +1,10 @@
+# ===========================================================================
+# MoonLander RSSM — Dreamer-style World Models for LunarLander Policy Training
+#
+# Copyright (c) 2026 Nikolai Smolyanskiy
+# Licensed under the MIT License. See LICENSE file for details.
+# ===========================================================================
+
 import argparse
 import os
 import yaml
@@ -11,12 +18,12 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def load_config(config_path):
     if not os.path.exists(config_path):
-        return 64, 128, 128, 1, 4
+        return 16, 256, 256, 1, 4
     with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f) or {}
     capacity = config.get("world_model", {}).get("capacity", {})
-    latent_dim = int(capacity.get("latent_dim", 64))
-    hidden_dim = int(capacity.get("hidden_dim", 128))
+    latent_dim = int(capacity.get("latent_dim", 16))
+    hidden_dim = int(capacity.get("hidden_dim", 256))
     mlp_hidden_dim = int(capacity.get("mlp_hidden_dim", hidden_dim))
     gru_num_layers = int(capacity.get("gru_num_layers", 1))
     action_dim = int(config.get("world_model", {}).get("action_dim", 4))

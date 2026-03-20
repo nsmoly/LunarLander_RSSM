@@ -1,4 +1,10 @@
-# collect_dataset.py
+# ===========================================================================
+# MoonLander RSSM — Dreamer-style World Models for LunarLander Policy Training
+#
+# Copyright (c) 2026 Nikolai Smolyanskiy
+# Licensed under the MIT License. See LICENSE file for details.
+# ===========================================================================
+
 import argparse
 import gymnasium as gym
 import gymnasium.envs.box2d.lunar_lander as lunar_lander_module

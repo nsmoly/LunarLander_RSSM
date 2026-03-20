@@ -1,4 +1,10 @@
-# train_models.py - World model and actor-critic training
+# ===========================================================================
+# MoonLander RSSM — Dreamer-style World Models for LunarLander Policy Training
+#
+# Copyright (c) 2026 Nikolai Smolyanskiy
+# Licensed under the MIT License. See LICENSE file for details.
+# ===========================================================================
+
 import argparse
 import os
 import random
