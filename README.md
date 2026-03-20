@@ -252,12 +252,8 @@ This release introduced a focused world-model refactor that significantly improv
 - Metrics like best late-stage observation RMSE alone were less predictive of MPC closed-loop quality.
 MAE metrics were not that informative since they don't account for outliers as well as RMSE metrics.
 
-### Final world_model.pt checkpoint currently used
+### Checkpoints: working world_model.pt, actor.pt and critic.pt checkpoints are in the repo
 
-- **Selected checkpoint: epoch 10**
-- This was chosen after direct WM-MPC evaluation across multiple seeds/checkpoints.
-- Checkpoints were tested directly via `wm_mpc_policy.py` (20 episodes per run, fixed planner/cost settings, varying world-model checkpoints/seeds).
-- Best observed run for the selected checkpoint:
-  - **Epoch 10, seed 12345**
-  - `mean_return=+96.17`, `worst_return=-87.50`
-  - Scorecard: **7/7 PASS**
+- WorldModel checkpoint (world_model.pt) is for epoch 200
+- AC RL Policy checkpoints (actor.pt and critic.pt) are for epoch 750
+- Also the repo has a world_model_random.pt checkpoint with random weights to compare with and poorly trained AC RL policy in actor_earlyBad_ep50.pt
