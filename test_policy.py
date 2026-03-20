@@ -43,6 +43,7 @@ def main():
                         help="Actor checkpoint (default: actor.pt)")
     parser.add_argument("--seed", type=int, default=12345, help="Random seed for reproducibility")
     parser.add_argument("--episodes", type=int, default=20, help="Number of episodes to run")
+    parser.add_argument("--max_steps", type=int, default=600, help="Max steps per episode")
     action_mode = parser.add_mutually_exclusive_group()
     action_mode.add_argument(
         "--deterministic",
@@ -79,7 +80,8 @@ def main():
         gru_num_layers=gru_num_layers,
         mlp_hidden_dim=mlp_hidden_dim,
     ).to(DEVICE)
-    actor = Actor(latent_dim=latent_dim, action_dim=action_dim, hidden_dim=hidden_dim).to(DEVICE)
+    actor = Actor(latent_dim=latent_dim, rssm_hidden_dim=hidden_dim,
+                  action_dim=action_dim, actor_hidden_dim=mlp_hidden_dim).to(DEVICE)
 
     wm_path = args.world_model or "world_model.pt"
     if not os.path.exists(wm_path):
@@ -145,7 +147,7 @@ def main():
                 elif event.type == KEYDOWN and event.key == K_ESCAPE:
                     running = False
 
-            action_dist = actor(z)
+            action_dist = actor(h, z)
             probs = action_dist.probs.squeeze(0).detach().cpu().numpy()
             if args.deterministic:
                 action = int(np.argmax(probs))
@@ -161,7 +163,7 @@ def main():
             episode_steps += 1
 
             next_obs, reward, terminated, truncated, _ = env.step(action)
-            done = terminated or truncated
+            done = terminated or truncated or episode_steps >= args.max_steps
             total_reward += reward
 
             if done and len(next_obs) >= 6:

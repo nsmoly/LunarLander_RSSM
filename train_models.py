@@ -169,6 +169,7 @@ def train_world_model(world_model, train_dataloader, val_dataloader, epochs=10, 
             obs_seq = obs_seq.to(DEVICE)
             actions_seq = actions_seq.to(DEVICE)
             rewards_seq = rewards_seq.to(DEVICE)
+            next_obs_seq = next_obs_seq.to(DEVICE)
             dones_seq = dones_seq.to(DEVICE).float()
             mask = mask.to(DEVICE)
 
@@ -177,8 +178,8 @@ def train_world_model(world_model, train_dataloader, val_dataloader, epochs=10, 
             latent_dim = world_model.rssm.latent_dim
 
             h = world_model.rssm.init_hidden(batch_size, DEVICE)
-            z_prev = torch.zeros(batch_size, latent_dim, device=DEVICE)
-            a_prev = torch.zeros(batch_size, action_dim, device=DEVICE)
+            z = torch.zeros(batch_size, latent_dim, device=DEVICE)
+            a_init = torch.zeros(batch_size, action_dim, device=DEVICE)
 
             sum_recon = 0.0
             sum_rew = 0.0
@@ -186,18 +187,41 @@ def train_world_model(world_model, train_dataloader, val_dataloader, epochs=10, 
             sum_done = 0.0
             total_mask = mask.sum().clamp_min(1.0)
 
-            for t in range(seq_len):
-                h = world_model.rssm.update_hidden(h, z_prev, a_prev)
-                mean_prior, logstd_prior = world_model.rssm.prior(h)
-                mean_post, logstd_post = world_model.rssm.posterior(h, obs_seq[:, t])
-                z_t = world_model.rssm.sample_latent(mean_post, logstd_post)
+            # Bootstrap: encode obs_seq[:, 0] to get initial RSSM state (h_0, z_0)
+            # This gives us the starting state s_0 from which transitions are predicted.
+            h = world_model.rssm.update_hidden(h, z, a_init)
+            mean_post_0, logstd_post_0 = world_model.rssm.posterior(h, obs_seq[:, 0])
+            z = world_model.rssm.sample_latent(mean_post_0, logstd_post_0)
 
-                physics_pred, contact_logits, done_logits_2d = world_model.decode_heads(h, z_t)
-                reward_pred = world_model.predict_reward(h, z_t)
+            # Transition loop: at each step t, we have state (h_t, z_t) encoding s_t.
+            # We take action a_t, roll the GRU to get h_{t+1}, then:
+            #   - prior(h_{t+1})    = what the model predicts about s_{t+1}
+            #   - posterior(h_{t+1}, next_obs[t]) = ground-truth-informed s_{t+1}
+            #   - decode(h_{t+1}, z_{t+1})  → reconstruct next_obs[t] (= s_{t+1})
+            #   - predict_reward(h_{t+1}, z_{t+1}) → reward for (s_t, a_t) transition
+            #   - predict_done(h_{t+1}, z_{t+1})   → done flag for (s_t, a_t) transition
+            #   - KL(posterior || prior) at t+1
+            for t in range(seq_len):
+                a_t = torch.nn.functional.one_hot(actions_seq[:, t], num_classes=action_dim).float()
+
+                # Roll hidden state forward: h_{t+1} = GRU(h_t, z_t, a_t)
+                h = world_model.rssm.update_hidden(h, z, a_t)
+
+                # Prior at t+1: model's prediction of s_{t+1} given history + a_t
+                mean_prior, logstd_prior = world_model.rssm.prior(h)
+
+                # Posterior at t+1: informed by actual next observation s_{t+1}
+                mean_post, logstd_post = world_model.rssm.posterior(h, next_obs_seq[:, t])
+                z = world_model.rssm.sample_latent(mean_post, logstd_post)
+
+                # Decode from (h_{t+1}, z_{t+1}) — should reconstruct s_{t+1}
+                physics_pred, contact_logits, done_logits_2d = world_model.decode_heads(h, z)
+                reward_pred = world_model.predict_reward(h, z)
                 done_logits = done_logits_2d.squeeze(-1)
 
-                physics_tgt = obs_seq[:, t, :6]
-                contact_tgt = obs_seq[:, t, 6:8]
+                # Targets are all from the transition (s_t, a_t) → s_{t+1}
+                physics_tgt = next_obs_seq[:, t, :6]
+                contact_tgt = next_obs_seq[:, t, 6:8]
                 physics_loss = (physics_pred - physics_tgt).pow(2).sum(-1)
                 contact_loss = F.binary_cross_entropy_with_logits(
                     contact_logits, contact_tgt, reduction="none"
@@ -212,9 +236,6 @@ def train_world_model(world_model, train_dataloader, val_dataloader, epochs=10, 
                 sum_rew += (reward_loss * mask_t).sum()
                 sum_done += (done_loss * mask_t).sum()
                 sum_kl += (kl * mask_t).sum()
-
-                z_prev = z_t
-                a_prev = torch.nn.functional.one_hot(actions_seq[:, t], num_classes=action_dim).float()
 
             loss = (
                 loss_weights[0] * sum_recon
@@ -265,6 +286,7 @@ def validate_world_model(world_model, val_dataloader, beta_kl=1.0, loss_weights=
             obs_seq = obs_seq.to(DEVICE)
             actions_seq = actions_seq.to(DEVICE)
             rewards_seq = rewards_seq.to(DEVICE)
+            next_obs_seq = next_obs_seq.to(DEVICE)
             dones_seq = dones_seq.to(DEVICE).float()
             mask = mask.to(DEVICE)
 
@@ -273,27 +295,38 @@ def validate_world_model(world_model, val_dataloader, beta_kl=1.0, loss_weights=
             latent_dim = world_model.rssm.latent_dim
 
             h = world_model.rssm.init_hidden(batch_size, DEVICE)
-            z_prev = torch.zeros(batch_size, latent_dim, device=DEVICE)
-            a_prev = torch.zeros(batch_size, action_dim, device=DEVICE)
+            z = torch.zeros(batch_size, latent_dim, device=DEVICE)
+            a_init = torch.zeros(batch_size, action_dim, device=DEVICE)
 
             sum_recon = 0.0
             sum_rew = 0.0
             sum_kl = 0.0
             sum_done = 0.0
 
-            for t in range(seq_len):
-                h = world_model.rssm.update_hidden(h, z_prev, a_prev)
-                mean_prior, logstd_prior = world_model.rssm.prior(h)
-                mean_post, logstd_post = world_model.rssm.posterior(h, obs_seq[:, t])
-                z_t = world_model.rssm.sample_latent(mean_post, logstd_post)
+            # Bootstrap: encode obs_seq[:, 0] to get initial state (h_0, z_0)
+            h = world_model.rssm.update_hidden(h, z, a_init)
+            mean_post_0, logstd_post_0 = world_model.rssm.posterior(h, obs_seq[:, 0])
+            z = world_model.rssm.sample_latent(mean_post_0, logstd_post_0)
 
-                obs_pred = world_model.reconstruct_obs(h, z_t)
-                physics_pred, contact_logits, done_logits_2d = world_model.decode_heads(h, z_t)
-                reward_pred = world_model.predict_reward(h, z_t)
+            # Transition loop: predict s_{t+1} from (s_t, a_t), supervise with next_obs[t]
+            for t in range(seq_len):
+                a_t = torch.nn.functional.one_hot(actions_seq[:, t], num_classes=action_dim).float()
+
+                # h_{t+1} = GRU(h_t, z_t, a_t)
+                h = world_model.rssm.update_hidden(h, z, a_t)
+                mean_prior, logstd_prior = world_model.rssm.prior(h)
+                mean_post, logstd_post = world_model.rssm.posterior(h, next_obs_seq[:, t])
+                z = world_model.rssm.sample_latent(mean_post, logstd_post)
+
+                # Decode (h_{t+1}, z_{t+1}) → reconstruct s_{t+1} = next_obs[t]
+                physics_pred, contact_logits, done_logits_2d = world_model.decode_heads(h, z)
+                obs_pred = world_model.make_obs_tensor(physics_pred, contact_logits)
+                reward_pred = world_model.predict_reward(h, z)
                 done_logits = done_logits_2d.squeeze(-1)
 
-                physics_tgt = obs_seq[:, t, :6]
-                contact_tgt = obs_seq[:, t, 6:8]
+                # Targets from transition (s_t, a_t) → s_{t+1}
+                physics_tgt = next_obs_seq[:, t, :6]
+                contact_tgt = next_obs_seq[:, t, 6:8]
                 physics_loss = (physics_pred - physics_tgt).pow(2).sum(-1)
                 contact_loss = F.binary_cross_entropy_with_logits(
                     contact_logits, contact_tgt, reduction="none"
@@ -309,9 +342,9 @@ def validate_world_model(world_model, val_dataloader, beta_kl=1.0, loss_weights=
                 sum_done += (done_loss * mask_t).sum()
                 sum_kl += (kl * mask_t).sum()
 
-                obs_diff = (obs_pred - obs_seq[:, t]).abs().sum(-1)
+                obs_diff = (obs_pred - next_obs_seq[:, t]).abs().sum(-1)
                 total_obs_abs += (obs_diff * mask_t).sum().item()
-                total_obs_sq += ((obs_pred - obs_seq[:, t]).pow(2).sum(-1) * mask_t).sum().item()
+                total_obs_sq += ((obs_pred - next_obs_seq[:, t]).pow(2).sum(-1) * mask_t).sum().item()
                 total_reward_abs += ((reward_pred - rewards_seq[:, t]).abs() * mask_t).sum().item()
                 total_reward_sq += (((reward_pred - rewards_seq[:, t]).pow(2)) * mask_t).sum().item()
 
@@ -322,9 +355,6 @@ def validate_world_model(world_model, val_dataloader, beta_kl=1.0, loss_weights=
                 total_done_correct += ((done_pred == dones_seq[:, t]).float() * mask_t).sum().item()
 
                 total_mask += mask_t.sum().item()
-
-                z_prev = z_t
-                a_prev = torch.nn.functional.one_hot(actions_seq[:, t], num_classes=action_dim).float()
 
             batch_mask = mask.sum().item()
             if batch_mask > 0:
@@ -372,58 +402,80 @@ def validate_world_model(world_model, val_dataloader, beta_kl=1.0, loss_weights=
 # Actor-critic: imagination
 # -----------------------------------------------------------------------------
 def imagine_rollout(world_model, actor, obs_seq, actions_seq,
-                                warmup_steps, imagination_steps):
+                    warmup_steps, imagination_steps):
     """Warm-up RSSM with real (obs, action) for warmup_steps, then imagine
     imagination_steps using the actor policy.  Caller must ensure all
     sequences have at least warmup_steps valid steps.
 
-    Returns zs, rewards, actions, observations (all shape B x imagination_steps x ...).
+    Convention: reward/done at step t are decoded from the
+    post-transition state (h_{t+1}, z_{t+1}), matching WM training where
+    predict_reward(h_{t+1}, z_{t+1}) targets r(s_t, a_t).
+
+    Returns (zs, hs, rewards, actions, done_probs) where:
+      zs, hs:     shape (B, T+1, ...) — states s_0..s_T+1 (T = imagination_steps)
+      rewards:    shape (B, T)        — r_t decoded from (h_{t+1}, z_{t+1})
+      actions:    shape (B, T)        — a_t taken at (h_t, z_t)
+      done_probs: shape (B, T)        — P(done) decoded from (h_{t+1}, z_{t+1})
     """
     ac_training = actor.training
     actor.eval()
     batch_size = obs_seq.size(0)
     action_dim = world_model.rssm.action_dim
     latent_dim = world_model.rssm.latent_dim
+    hidden_dim = world_model.rssm.hidden_dim
+    T = imagination_steps
+
     with torch.no_grad():
+        # Warmup: run RSSM with real observations and actions to build
+        # an accurate latent state before free-running imagination.
         h = world_model.rssm.init_hidden(batch_size, DEVICE)
-        z_prev = torch.zeros(batch_size, latent_dim, device=DEVICE)
+        z = torch.zeros(batch_size, latent_dim, device=DEVICE)
         a_prev = torch.zeros(batch_size, action_dim, device=DEVICE)
 
-        for t in range(warmup_steps):
-            h = world_model.rssm.update_hidden(h, z_prev, a_prev)
-            mean_post, logstd_post = world_model.rssm.posterior(h, obs_seq[:, t])
-            z_prev = world_model.rssm.sample_latent(mean_post, logstd_post)
-            a_prev = torch.nn.functional.one_hot(actions_seq[:, t], num_classes=action_dim).float()
+        # Bootstrap from obs_seq[:, 0] (same convention as WM training)
+        h = world_model.rssm.update_hidden(h, z, a_prev)
+        mean_post, logstd_post = world_model.rssm.posterior(h, obs_seq[:, 0])
+        z = world_model.rssm.sample_latent(mean_post, logstd_post)
 
-        z = z_prev
+        # Continue warmup: transition (s_t, a_t) → s_{t+1} via obs_seq
+        for t in range(warmup_steps - 1):
+            a_t = torch.nn.functional.one_hot(actions_seq[:, t], num_classes=action_dim).float()
+            h = world_model.rssm.update_hidden(h, z, a_t)
+            mean_post, logstd_post = world_model.rssm.posterior(h, obs_seq[:, t + 1])
+            z = world_model.rssm.sample_latent(mean_post, logstd_post)
 
-    zs = []
-    rewards = []
-    actions = []
-    observations = []
+        # Pre-allocate: T+1 states (s_0..s_T), T transitions
+        zs = torch.zeros(batch_size, T + 1, latent_dim, device=DEVICE)
+        hs = torch.zeros(batch_size, T + 1, hidden_dim, device=DEVICE)
+        rewards = torch.zeros(batch_size, T, device=DEVICE)
+        actions = torch.zeros(batch_size, T, dtype=torch.long, device=DEVICE)
+        done_probs = torch.zeros(batch_size, T, device=DEVICE)
 
-    for t in range(imagination_steps):
-        action_distr = actor(z)
-        a = action_distr.sample()
-        a_onehot = torch.nn.functional.one_hot(a, num_classes=action_dim).float()
+        # s_0 = state after warmup
+        zs[:, 0] = z
+        hs[:, 0] = h
 
-        h = world_model.rssm.update_hidden(h, z, a_onehot)
-        mean_prior, logstd_prior = world_model.rssm.prior(h)
-        z = world_model.rssm.sample_latent(mean_prior, logstd_prior)
-        r = world_model.predict_reward(h, z)
-        obs_imagined = world_model.reconstruct_obs(h, z)
+        for t in range(T):
+            # At state (h_t, z_t): actor picks a_t
+            action_distr = actor(hs[:, t], zs[:, t])
+            a = action_distr.sample()
+            a_onehot = torch.nn.functional.one_hot(a, num_classes=action_dim).float()
 
-        zs.append(z)
-        rewards.append(r)
-        actions.append(a)
-        observations.append(obs_imagined)
+            # Transition: h_{t+1} = GRU(h_t, z_t, a_t), z_{t+1} = prior(h_{t+1})
+            h = world_model.rssm.update_hidden(h, zs[:, t], a_onehot)
+            mean_prior, _ = world_model.rssm.prior(h)
+            z = mean_prior
 
-    zs = torch.stack(zs, dim=1)
-    rewards = torch.stack(rewards, dim=1)
-    actions = torch.stack(actions, dim=1)
-    observations = torch.stack(observations, dim=1)
+            # Store s_{t+1} and transition outputs
+            zs[:, t + 1] = z
+            hs[:, t + 1] = h
+            actions[:, t] = a
+            # Convention: reward/done decoded from post-transition state
+            rewards[:, t] = world_model.predict_reward(h, z)
+            done_probs[:, t] = torch.sigmoid(world_model.predict_done_logits(h, z))
+
     actor.train(ac_training)
-    return zs, rewards, actions, observations
+    return zs, hs, rewards, actions, done_probs
 
 
 def train_actor_critic(world_model, actor, critic, dataloader,
@@ -432,7 +484,7 @@ def train_actor_critic(world_model, actor, critic, dataloader,
                        loss_weights=(1.0, 1.0), entropy_coeff=0.01,
                        entropy_coeff_end=None,
                        checkpoint_freq=100, start_epoch=0, log_path=None,
-                       advantage_clip=3.0, actor_grad_clip=10.0,
+                       advantage_clip=3.0, actor_grad_clip=10.0, critic_grad_clip=100.0,
                        collapse_entropy_threshold=0.2, collapse_actor_grad_threshold=1e-3,
                        collapse_max_action_prob_threshold=0.98, collapse_patience_epochs=3,
                        low_entropy_actor_lr_threshold=0.9,
@@ -488,29 +540,37 @@ def train_actor_critic(world_model, actor, critic, dataloader,
                 actions_seq = actions_seq[valid]
                 mask = mask[valid]
 
-            zs, imagined_rewards, imagined_actions, imagined_observations = imagine_rollout(
+            zs, hs, imagined_rewards, imagined_actions, imagined_done_probs = imagine_rollout(
                 world_model, actor, obs_seq, actions_seq,
                 warmup_steps=warmup_steps, imagination_steps=imagination_steps,
             )
-
-            zs = zs.detach()
-            imagined_rewards = imagined_rewards.detach()
-            imagined_actions = imagined_actions.detach()
-            imagined_observations = imagined_observations.detach()
+            # zs, hs: (B, T+1, ...) — states s_0..s_T+1
+            # imagined_rewards[t]   = reward for (s_t, a_t) transition, decoded from s_{t+1}
+            # imagined_done_probs[t]= P(done) for (s_t, a_t) transition, decoded from s_{t+1}
+            # imagined_actions[t]   = a_t taken at s_t
 
             with torch.no_grad():
-                values = critic(zs)
-                next_values = torch.cat([values[:, 1:], torch.zeros_like(values[:, -1:])], dim=1)
+                # GAE: V(s_t) from source states, V(s_{t+1}) from next states
+                src_h = hs[:, :-1].reshape(-1, hs.size(-1))   # (B*T, hidden_dim)
+                src_z = zs[:, :-1].reshape(-1, zs.size(-1))   # (B*T, latent_dim)
+                nxt_h = hs[:, 1:].reshape(-1, hs.size(-1))    # (B*T, hidden_dim)
+                nxt_z = zs[:, 1:].reshape(-1, zs.size(-1))    # (B*T, latent_dim)
+                B = hs.size(0)
 
-                deltas = imagined_rewards + gamma * next_values - values
+                cur_values = critic(src_h, src_z).reshape(B, imagination_steps)
+                next_values = critic(nxt_h, nxt_z).reshape(B, imagination_steps)
+
+                continues = 1.0 - imagined_done_probs
+                deltas = imagined_rewards + gamma * continues * next_values - cur_values
                 adv = torch.zeros_like(deltas)
                 gae = torch.zeros_like(deltas[:, 0])
                 for t in reversed(range(imagination_steps)):
-                    gae = deltas[:, t] + gamma * lambda_gae * gae
+                    gae = deltas[:, t] + gamma * lambda_gae * continues[:, t] * gae
                     adv[:, t] = gae
-                returns = adv + values
+                returns = adv + cur_values
 
-            action_distr = actor(zs.reshape(-1, zs.size(-1)))
+            # Actor loss: evaluate at source states (correct state-action pairing)
+            action_distr = actor(src_h, src_z)
             log_probs = action_distr.log_prob(imagined_actions.reshape(-1))
             adv_flat = adv.reshape(-1).detach()
             adv_flat = (adv_flat - adv_flat.mean()) / (adv_flat.std() + 1e-8)
@@ -520,7 +580,7 @@ def train_actor_critic(world_model, actor, critic, dataloader,
                 -(log_probs * adv_flat).mean() - current_entropy_coeff * action_distr.entropy().mean()
             )
 
-            value_pred = critic(zs.reshape(-1, zs.size(-1)))
+            value_pred = critic(src_h, src_z)
             critic_loss = loss_weights[1] * (value_pred - returns.reshape(-1).detach()).pow(2).mean()
 
             opt_actor.zero_grad()
@@ -532,7 +592,7 @@ def train_actor_critic(world_model, actor, critic, dataloader,
             opt_critic.zero_grad()
             critic_loss.backward()
             critic_grad_norm = _grad_norm(critic.parameters())
-            torch.nn.utils.clip_grad_norm_(critic.parameters(), 100.0)
+            torch.nn.utils.clip_grad_norm_(critic.parameters(), critic_grad_clip)
             opt_critic.step()
 
             imagined_reward_mean = imagined_rewards.mean().item()
@@ -633,7 +693,7 @@ def train_actor_critic(world_model, actor, critic, dataloader,
 # Main
 # -----------------------------------------------------------------------------
 def main():
-    parser = argparse.ArgumentParser(description="Train Dreamer offline on LunarLander")
+    parser = argparse.ArgumentParser(description="Trains world model and actor-critic policy offline from the data collected in LunarLander gym environment")
     parser.add_argument('--phase', choices=['world_model', 'actor_critic'], required=True,
                         help='Which phase to train: world_model or actor_critic')
     parser.add_argument('--config', type=str, default='config.yaml',
@@ -804,8 +864,10 @@ def main():
             raise FileNotFoundError("world_model.pt not found. Train the world model first.")
         world_model.eval()
 
-        actor = Actor(latent_dim=latent_dim, action_dim=action_dim, hidden_dim=hidden_dim).to(DEVICE)
-        critic = Critic(latent_dim=latent_dim, hidden_dim=hidden_dim).to(DEVICE)
+        actor = Actor(latent_dim=latent_dim, rssm_hidden_dim=hidden_dim,
+                      action_dim=action_dim, actor_hidden_dim=mlp_hidden_dim).to(DEVICE)
+        critic = Critic(latent_dim=latent_dim, rssm_hidden_dim=hidden_dim,
+                        critic_hidden_dim=mlp_hidden_dim).to(DEVICE)
 
         latest_actor = get_latest_checkpoint("actor")
         start_epoch = 0
@@ -838,9 +900,11 @@ def main():
         critic_weight = loss_weights.get('critic', 0.25)
         entropy_coeff = loss_weights.get('entropy', 0.01)
         entropy_coeff_end = loss_weights.get('entropy_final', entropy_coeff)
+        gamma = phase_config.get('gamma', 0.99)
         lambda_gae = phase_config.get('lambda_gae', 0.95)
         advantage_clip = phase_config.get('advantage_clip', 3.0)
         actor_grad_clip = phase_config.get('actor_grad_clip', 10.0)
+        critic_grad_clip = phase_config.get('critic_grad_clip', 100.0)
         collapse_entropy_threshold = phase_config.get('collapse_entropy_threshold', 0.2)
         collapse_actor_grad_threshold = phase_config.get('collapse_actor_grad_threshold', 1e-3)
         collapse_max_action_prob_threshold = phase_config.get('collapse_max_action_prob_threshold', 0.98)
@@ -865,7 +929,7 @@ def main():
         log_message(f"Dataset: {len(dataset)} valid (episode, start) positions", log_path)
 
         train_actor_critic(world_model, actor, critic, dataloader,
-                          epochs=epochs, lr=lr,
+                          epochs=epochs, lr=lr, gamma=gamma,
                           warmup_steps=warmup_steps,
                           imagination_steps=imagination_steps,
                           lambda_gae=lambda_gae,
@@ -873,7 +937,7 @@ def main():
                           entropy_coeff_end=entropy_coeff_end,
                           checkpoint_freq=checkpoint_freq,
                           start_epoch=start_epoch, log_path=log_path,
-                          advantage_clip=advantage_clip, actor_grad_clip=actor_grad_clip,
+                          advantage_clip=advantage_clip, actor_grad_clip=actor_grad_clip, critic_grad_clip=critic_grad_clip,
                           collapse_entropy_threshold=collapse_entropy_threshold,
                           collapse_actor_grad_threshold=collapse_actor_grad_threshold,
                           collapse_max_action_prob_threshold=collapse_max_action_prob_threshold,

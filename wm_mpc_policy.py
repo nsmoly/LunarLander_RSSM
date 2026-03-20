@@ -222,9 +222,9 @@ def main():
     parser.add_argument("--seed", type=int, default=12345, help="Random seed")
     parser.add_argument("--max_steps", type=int, default=600, help="Max steps per episode")
     parser.add_argument("--render", action="store_true", help="Enable render window")
-    parser.add_argument("--horizon", type=int, default=15, help="MPC planning horizon")
-    parser.add_argument("--population", type=int, default=256, help="CEM population size")
-    parser.add_argument("--elites", type=int, default=32, help="Number of elites in CEM")
+    parser.add_argument("--horizon", type=int, default=25, help="MPC planning horizon")
+    parser.add_argument("--population", type=int, default=384, help="CEM population size")
+    parser.add_argument("--elites", type=int, default=48, help="Number of elites in CEM")
     parser.add_argument("--cem_iters", type=int, default=4, help="Number of CEM iterations")
     parser.add_argument("--cem_alpha", type=float, default=0.7, help="Logit smoothing (0..1)")
     parser.add_argument("--temperature", type=float, default=1.0, help="Sampling temperature")
@@ -232,18 +232,18 @@ def main():
     parser.add_argument("--reward_weight", type=float, default=0.2, help="Weight for predicted reward")
     parser.add_argument("--done_penalty", type=float, default=2.5, help="Penalty for predicted done probability")
 
-    parser.add_argument("--w_x", type=float, default=0.18, help="Base weight for |x|")
-    parser.add_argument("--w_y", type=float, default=0.20, help="Weight for |y| (target y=0)")
-    parser.add_argument("--w_vx", type=float, default=0.70, help="Weight for |vx|")
-    parser.add_argument("--w_vy_down", type=float, default=1.90, help="Weight for excess downward speed")
-    parser.add_argument("--w_angle", type=float, default=1.20, help="Base weight for |angle|")
-    parser.add_argument("--w_angle_near", type=float, default=1.20, help="Extra |angle| weight near ground")
+    parser.add_argument("--w_x", type=float, default=1.00, help="Base weight for |x|")
+    parser.add_argument("--w_y", type=float, default=0.40, help="Weight for |y| (target y=0)")
+    parser.add_argument("--w_vx", type=float, default=1.00, help="Weight for |vx|")
+    parser.add_argument("--w_vy_down", type=float, default=1.20, help="Weight for excess downward speed")
+    parser.add_argument("--w_angle", type=float, default=0.50, help="Base weight for |angle|")
+    parser.add_argument("--w_angle_near", type=float, default=1.50, help="Extra |angle| weight near ground")
     parser.add_argument("--w_ang_vel", type=float, default=0.70, help="Base weight for |angular velocity|")
-    parser.add_argument("--w_ang_vel_near", type=float, default=0.90, help="Extra |angular velocity| weight near ground")
+    parser.add_argument("--w_ang_vel_near", type=float, default=1.20, help="Extra |angular velocity| weight near ground")
     parser.add_argument("--y_near", type=float, default=0.35, help="Near-ground activation threshold")
     parser.add_argument("--y_near_temp", type=float, default=0.08, help="Near-ground gate smoothness")
-    parser.add_argument("--vy_allowed_far", type=float, default=0.60, help="Allowed downward speed far from ground")
-    parser.add_argument("--vy_allowed_near", type=float, default=0.12, help="Allowed downward speed near ground")
+    parser.add_argument("--vy_allowed_far", type=float, default=0.80, help="Allowed downward speed far from ground")
+    parser.add_argument("--vy_allowed_near", type=float, default=0.18, help="Allowed downward speed near ground")
     args = parser.parse_args()
 
     if args.horizon < 1:
@@ -330,6 +330,7 @@ def main():
                 action, best_score, best_step0_reward, best_step0_cost = cem_plan(
                     world_model, h, z, action_dim, args
                 )
+
             planner_steps += 1
             planner_score_sum += float(best_score)
             planner_step0_reward_sum += float(best_step0_reward)

@@ -40,11 +40,10 @@ def load_episodes(dataset_path):
             continue
         order = np.argsort(step_index[idxs], kind="stable")
         idxs = idxs[order]
-        # obs_full = [obs[0], obs[1], ..., obs[N-1], terminal] for alignment with preds
-        obs_full = np.concatenate([obs[idxs], next_obs[idxs[-1:]]], axis=0)
         episodes.append({
             "ep_id": int(ep_id),
-            "obs": obs_full,
+            "obs": obs[idxs],
+            "next_obs": next_obs[idxs],
             "actions": actions[idxs],
             "rewards": rewards[idxs],
             "dones": dones[idxs],
@@ -187,34 +186,50 @@ def animate_lander(obs_gt, obs_pred=None, title="", plot_dir=None, filename="ani
 
 
 def rollout_teacher(world_model, episode):
-    obs_gt = episode["obs"]
-    actions = episode["actions"]
-    rewards_gt = episode["rewards"]
+    """Teacher-forced rollout: at each step, use ground-truth obs for posterior.
+    Convention: state (h_{t+1}, z_{t+1}) after transition predicts
+    next_obs[t] (reconstruction) and rewards[t] (transition reward)."""
+    obs = episode["obs"]           # length N: s_0..s_{N-1}
+    next_obs = episode["next_obs"] # length N: s_1..s_N
+    actions = episode["actions"]   # length N: a_0..a_{N-1}
+    rewards_gt = episode["rewards"]  # length N: r(s_t, a_t)
     obs_pred = []
     reward_pred = []
 
     with torch.no_grad():
         h = world_model.rssm.init_hidden(1, DEVICE)
-        z_prev = torch.zeros(1, world_model.rssm.latent_dim, device=DEVICE)
-        a_prev = torch.zeros(1, world_model.rssm.action_dim, device=DEVICE)
+        z = torch.zeros(1, world_model.rssm.latent_dim, device=DEVICE)
+        a_init = torch.zeros(1, world_model.rssm.action_dim, device=DEVICE)
 
+        # Bootstrap: encode obs[0] to get initial state (h_0, z_0)
+        h = world_model.rssm.update_hidden(h, z, a_init)
+        obs_t = torch.tensor(obs[0], dtype=torch.float32, device=DEVICE).unsqueeze(0)
+        mean_post, logstd_post = world_model.rssm.posterior(h, obs_t)
+        z = mean_post
+
+        # Transition loop: take a_t, roll to (h_{t+1}, z_{t+1}), decode s_{t+1}
         for t in range(len(actions)):
-            h = world_model.rssm.update_hidden(h, z_prev, a_prev)
-            obs_t = torch.tensor(obs_gt[t], dtype=torch.float32, device=DEVICE).unsqueeze(0)
-            mean_post, logstd_post = world_model.rssm.posterior(h, obs_t)
-            z_t = mean_post
-            obs_hat = world_model.reconstruct_obs(h, z_t)
-            obs_pred.append(obs_hat.squeeze(0).cpu().numpy())
-            r_hat = world_model.predict_reward(h, z_t)
-            reward_pred.append(r_hat.item())
-
-            a_prev = torch.nn.functional.one_hot(
+            a_t = torch.nn.functional.one_hot(
                 torch.tensor([actions[t]], device=DEVICE),
                 num_classes=world_model.rssm.action_dim
             ).float()
-            z_prev = z_t
 
-    obs_gt_c = obs_gt[: len(obs_pred)]
+            # h_{t+1} = GRU(h_t, z_t, a_t)
+            h = world_model.rssm.update_hidden(h, z, a_t)
+            # Posterior at t+1: informed by next_obs[t] = s_{t+1}
+            obs_next = torch.tensor(next_obs[t], dtype=torch.float32, device=DEVICE).unsqueeze(0)
+            mean_post, logstd_post = world_model.rssm.posterior(h, obs_next)
+            z = mean_post
+
+            # Decode (h_{t+1}, z_{t+1}) → reconstruct s_{t+1}
+            obs_hat = world_model.reconstruct_obs(h, z)
+            obs_pred.append(obs_hat.squeeze(0).cpu().numpy())
+            # Reward for transition (s_t, a_t), decoded from post-transition state
+            r_hat = world_model.predict_reward(h, z)
+            reward_pred.append(r_hat.item())
+
+    # obs_pred[t] should match next_obs[t]
+    obs_gt_c = next_obs[: len(obs_pred)]
     obs_pred_a = np.asarray(obs_pred, dtype=np.float32)
     reward_pred_a = np.asarray(reward_pred, dtype=np.float32)
     rewards_gt_c = rewards_gt[: len(reward_pred)]
@@ -222,7 +237,11 @@ def rollout_teacher(world_model, episode):
 
 
 def rollout_open(world_model, episode):
-    obs_gt = episode["obs"]
+    """Open-loop rollout: bootstrap from obs[0], then use prior (no observations).
+    Convention: state (h_{t+1}, z_{t+1}) after transition predicts
+    next_obs[t] and rewards[t]."""
+    obs = episode["obs"]           # length N: s_0..s_{N-1}
+    next_obs = episode["next_obs"] # length N: s_1..s_N
     actions = episode["actions"]
     rewards_gt = episode["rewards"]
     dones = episode["dones"]
@@ -231,76 +250,218 @@ def rollout_open(world_model, episode):
 
     with torch.no_grad():
         h = world_model.rssm.init_hidden(1, DEVICE)
-        z_prev = torch.zeros(1, world_model.rssm.latent_dim, device=DEVICE)
-        a_prev = torch.zeros(1, world_model.rssm.action_dim, device=DEVICE)
+        z = torch.zeros(1, world_model.rssm.latent_dim, device=DEVICE)
+        a_init = torch.zeros(1, world_model.rssm.action_dim, device=DEVICE)
 
-        # Initialize from posterior at t=0
-        h = world_model.rssm.update_hidden(h, z_prev, a_prev)
-        obs_t = torch.tensor(obs_gt[0], dtype=torch.float32, device=DEVICE).unsqueeze(0)
-        mean_post, logstd_post = world_model.rssm.posterior(h, obs_t)
-        z_prev = mean_post
+        # Bootstrap: encode obs[0] to get initial state (h_0, z_0)
+        h = world_model.rssm.update_hidden(h, z, a_init)
+        obs_t = torch.tensor(obs[0], dtype=torch.float32, device=DEVICE).unsqueeze(0)
+        mean_post, _ = world_model.rssm.posterior(h, obs_t)
+        z = mean_post
 
+        # Open-loop transition: take a_t, roll to (h_{t+1}, z_{t+1}) using prior
         for t in range(len(actions)):
             if dones[t]:
                 break
-            h = world_model.rssm.update_hidden(h, z_prev, a_prev)
-            mean_prior, logstd_prior = world_model.rssm.prior(h)
-            z_t = mean_prior
-            obs_hat = world_model.reconstruct_obs(h, z_t)
-            obs_pred.append(obs_hat.squeeze(0).cpu().numpy())
-            r_hat = world_model.predict_reward(h, z_t)
-            reward_pred.append(r_hat.item())
-
-            a_prev = torch.nn.functional.one_hot(
+            a_t = torch.nn.functional.one_hot(
                 torch.tensor([actions[t]], device=DEVICE),
                 num_classes=world_model.rssm.action_dim
             ).float()
-            z_prev = z_t
 
-    obs_pred_a = np.asarray(obs_pred, dtype=np.float32) if obs_pred else np.empty((0, obs_gt.shape[1]), dtype=np.float32)
-    obs_gt_compare = obs_gt[1 : 1 + len(obs_pred)]
+            # h_{t+1} = GRU(h_t, z_t, a_t), z_{t+1} = prior(h_{t+1})
+            h = world_model.rssm.update_hidden(h, z, a_t)
+            mean_prior, _ = world_model.rssm.prior(h)
+            z = mean_prior
+
+            # Decode (h_{t+1}, z_{t+1}) → reconstruct s_{t+1}, predict r(s_t, a_t)
+            obs_hat = world_model.reconstruct_obs(h, z)
+            obs_pred.append(obs_hat.squeeze(0).cpu().numpy())
+            r_hat = world_model.predict_reward(h, z)
+            reward_pred.append(r_hat.item())
+
+    obs_pred_a = np.asarray(obs_pred, dtype=np.float32) if obs_pred else np.empty((0, obs.shape[1]), dtype=np.float32)
+    obs_gt_compare = next_obs[: len(obs_pred)]
     reward_pred_a = np.asarray(reward_pred, dtype=np.float32)
     rewards_gt_c = rewards_gt[: len(reward_pred)]
     return obs_gt_compare, obs_pred_a, rewards_gt_c, reward_pred_a
 
 
 def rollout_sim(world_model, episode, constant_action):
-    obs_gt = episode["obs"]
+    """Sim rollout: bootstrap from obs[0], then apply a constant action using prior.
+    Convention: decode from post-transition state."""
+    obs = episode["obs"]
     dones = episode["dones"]
     obs_pred = []
     prior_stds = []
 
     with torch.no_grad():
         h = world_model.rssm.init_hidden(1, DEVICE)
-        z_prev = torch.zeros(1, world_model.rssm.latent_dim, device=DEVICE)
-        a_prev = torch.zeros(1, world_model.rssm.action_dim, device=DEVICE)
+        z = torch.zeros(1, world_model.rssm.latent_dim, device=DEVICE)
+        a_init = torch.zeros(1, world_model.rssm.action_dim, device=DEVICE)
 
-        # Initialize from posterior at t=0
-        h = world_model.rssm.update_hidden(h, z_prev, a_prev)
-        obs_t = torch.tensor(obs_gt[0], dtype=torch.float32, device=DEVICE).unsqueeze(0)
-        mean_post, logstd_post = world_model.rssm.posterior(h, obs_t)
-        z_prev = mean_post
+        # Bootstrap: encode obs[0] to get initial state (h_0, z_0)
+        h = world_model.rssm.update_hidden(h, z, a_init)
+        obs_t = torch.tensor(obs[0], dtype=torch.float32, device=DEVICE).unsqueeze(0)
+        mean_post, _ = world_model.rssm.posterior(h, obs_t)
+        z = mean_post
 
+        a_const = torch.nn.functional.one_hot(
+            torch.tensor([constant_action], device=DEVICE),
+            num_classes=world_model.rssm.action_dim
+        ).float()
+
+        # Sim loop: apply constant action, roll using prior
         for t in range(len(episode["actions"])):
             if dones[t]:
                 break
-            h = world_model.rssm.update_hidden(h, z_prev, a_prev)
+            # h_{t+1} = GRU(h_t, z_t, a_const), z_{t+1} = prior(h_{t+1})
+            h = world_model.rssm.update_hidden(h, z, a_const)
             mean_prior, logstd_prior = world_model.rssm.prior(h)
             std_prior = torch.exp(logstd_prior)
             prior_stds.append(std_prior.mean().item())
-            z_t = mean_prior
-            obs_hat = world_model.reconstruct_obs(h, z_t)
+            z = mean_prior
+
+            # Decode (h_{t+1}, z_{t+1}) → predicted s_{t+1}
+            obs_hat = world_model.reconstruct_obs(h, z)
             obs_pred.append(obs_hat.squeeze(0).cpu().numpy())
 
-            a_prev = torch.nn.functional.one_hot(
-                torch.tensor([constant_action], device=DEVICE),
-                num_classes=world_model.rssm.action_dim
-            ).float()
-            z_prev = z_t
-
-    obs_pred = np.asarray(obs_pred, dtype=np.float32) if obs_pred else np.empty((0, obs_gt.shape[1]), dtype=np.float32)
+    obs_pred = np.asarray(obs_pred, dtype=np.float32) if obs_pred else np.empty((0, obs.shape[1]), dtype=np.float32)
     prior_stds = np.asarray(prior_stds, dtype=np.float64)
     return obs_pred, prior_stds
+
+
+def control_symmetry_test(world_model, episodes, num_episodes=10,
+                          warmup_steps=20, sample_every=5, seed=0):
+    """Test control sensitivity: from teacher-forced states, apply each action
+    for one step and compare predicted observation deltas.  Checks that
+    left/right engines are symmetric and main engine pushes upward."""
+    ACTION_NAMES = ["idle", "left", "main", "right"]
+    OBS_NAMES = ["x", "y", "vx", "vy", "angle", "ang_vel",
+                 "left_contact", "right_contact"]
+
+    action_dim = world_model.rssm.action_dim
+    latent_dim = world_model.rssm.latent_dim
+
+    rng = np.random.default_rng(seed)
+    picks = rng.choice(len(episodes),
+                       size=min(num_episodes, len(episodes)), replace=False)
+
+    states = []
+    for ep_idx in picks:
+        ep = episodes[ep_idx]
+        obs = ep["obs"]
+        next_obs = ep["next_obs"]
+        actions = ep["actions"]
+        max_t = min(len(actions), warmup_steps + sample_every * 10)
+
+        with torch.no_grad():
+            h = world_model.rssm.init_hidden(1, DEVICE)
+            z = torch.zeros(1, latent_dim, device=DEVICE)
+            a_init = torch.zeros(1, action_dim, device=DEVICE)
+
+            h = world_model.rssm.update_hidden(h, z, a_init)
+            obs_t = torch.tensor(obs[0], dtype=torch.float32,
+                                 device=DEVICE).unsqueeze(0)
+            mean_post, _ = world_model.rssm.posterior(h, obs_t)
+            z = mean_post
+
+            for t in range(max_t):
+                a_t = torch.nn.functional.one_hot(
+                    torch.tensor([actions[t]], device=DEVICE),
+                    num_classes=action_dim).float()
+                h = world_model.rssm.update_hidden(h, z, a_t)
+                obs_next_t = torch.tensor(next_obs[t], dtype=torch.float32,
+                                          device=DEVICE).unsqueeze(0)
+                mean_post, _ = world_model.rssm.posterior(h, obs_next_t)
+                z = mean_post
+
+                if t >= warmup_steps and (t - warmup_steps) % sample_every == 0:
+                    obs_current = world_model.reconstruct_obs(
+                        h, z).squeeze(0).cpu().numpy()
+                    states.append((h.clone(), z.clone(), obs_current))
+
+    if not states:
+        print("No states collected for symmetry test.")
+        return
+
+    print(f"\nControl Symmetry Test: {len(states)} states from "
+          f"{len(picks)} episodes")
+    print(f"(warmup={warmup_steps}, sample_every={sample_every})\n")
+
+    deltas = {a: [] for a in range(action_dim)}
+    with torch.no_grad():
+        for h_state, z_state, obs_before in states:
+            for a in range(action_dim):
+                a_oh = torch.nn.functional.one_hot(
+                    torch.tensor([a], device=DEVICE),
+                    num_classes=action_dim).float()
+                h_next = world_model.rssm.update_hidden(h_state, z_state, a_oh)
+                mean_prior, _ = world_model.rssm.prior(h_next)
+                obs_after = world_model.reconstruct_obs(
+                    h_next, mean_prior).squeeze(0).cpu().numpy()
+                deltas[a].append(obs_after - obs_before)
+
+    mean_deltas = {a: np.mean(deltas[a], axis=0) for a in range(action_dim)}
+    std_deltas = {a: np.std(deltas[a], axis=0) for a in range(action_dim)}
+
+    n_obs = min(len(OBS_NAMES), len(mean_deltas[0]))
+    header = f"{'dim':<14}" + "".join(f"{ACTION_NAMES[a]:>12}" for a in range(action_dim))
+    print(header)
+    print("-" * len(header))
+    for d in range(n_obs):
+        row = f"{OBS_NAMES[d]:<14}"
+        for a in range(action_dim):
+            row += f"{mean_deltas[a][d]:>+12.5f}"
+        print(row)
+
+    print()
+    header2 = f"{'std':<14}" + "".join(f"{ACTION_NAMES[a]:>12}" for a in range(action_dim))
+    print(header2)
+    print("-" * len(header2))
+    for d in range(n_obs):
+        row = f"{OBS_NAMES[d]:<14}"
+        for a in range(action_dim):
+            row += f"{std_deltas[a][d]:>12.5f}"
+        print(row)
+
+    print("\n=== Symmetry Analysis (relative to idle) ===")
+    idle = mean_deltas[0]
+    rel = {a: mean_deltas[a] - idle for a in range(action_dim)}
+
+    n_obs_rel = min(len(OBS_NAMES), len(rel[0]))
+    header_r = f"{'dim':<14}" + "".join(f"{ACTION_NAMES[a]:>12}" for a in range(1, action_dim))
+    print(header_r)
+    print("-" * len(header_r))
+    for d in range(n_obs_rel):
+        row = f"{OBS_NAMES[d]:<14}"
+        for a in range(1, action_dim):
+            row += f"{rel[a][d]:>+12.5f}"
+        print(row)
+
+    def ratio_str(a, b):
+        if abs(b) < 1e-8:
+            return "inf"
+        return f"{abs(a / b):.3f}"
+
+    print()
+    rav_l, rav_r = rel[1][5], rel[3][5]
+    print(f"Δang_vel   left={rav_l:+.5f}  right={rav_r:+.5f}  "
+          f"|ratio|={ratio_str(rav_l, rav_r)}  "
+          f"signs={'opposite OK' if rav_l * rav_r < 0 else 'SAME — BAD'}")
+
+    rvx_l, rvx_r = rel[1][2], rel[3][2]
+    print(f"Δvx        left={rvx_l:+.5f}  right={rvx_r:+.5f}  "
+          f"|ratio|={ratio_str(rvx_l, rvx_r)}  "
+          f"signs={'opposite OK' if rvx_l * rvx_r < 0 else 'SAME — BAD'}")
+
+    rvy_main = rel[2][3]
+    print(f"Δvy        main={rvy_main:+.5f}  "
+          f"{'positive OK (pushes up)' if rvy_main > 0 else 'NEGATIVE — BAD'}")
+
+    rang_l, rang_r = rel[1][4], rel[3][4]
+    print(f"Δangle     left={rang_l:+.5f}  right={rang_r:+.5f}  "
+          f"|ratio|={ratio_str(rang_l, rang_r)}  "
+          f"signs={'opposite OK' if rang_l * rang_r < 0 else 'SAME — BAD'}")
 
 
 def compute_reward_metrics(rewards_gt, reward_pred):
@@ -347,8 +508,9 @@ def main():
                         help="Path to config file")
     parser.add_argument("--checkpoint", default=None,
                         help="Path to world model checkpoint (default: world_model.pt)")
-    parser.add_argument("--mode", choices=["teacher", "open", "sim"], default="teacher",
-                        help="teacher: posterior reconstruction; open: prior rollout; sim: constant action rollout")
+    parser.add_argument("--mode", choices=["teacher", "open", "sim", "symmetry"], default="teacher",
+                        help="teacher: posterior reconstruction; open: prior rollout; "
+                             "sim: constant action rollout; symmetry: control sensitivity test")
     parser.add_argument("--max_episodes", type=int, default=5,
                         help="Number of episodes to evaluate")
     parser.add_argument("--seed", type=int, default=0,
@@ -359,6 +521,10 @@ def main():
                         help="Render animations (GT vs pred for teacher/open, pred only for sim)")
     parser.add_argument("--constant_action", type=int, default=0,
                         help="Action id for sim mode")
+    parser.add_argument("--warmup_steps", type=int, default=20,
+                        help="Warmup steps for symmetry test")
+    parser.add_argument("--sample_every", type=int, default=5,
+                        help="Sample state every N steps after warmup (symmetry test)")
     args = parser.parse_args()
 
     episodes = load_episodes(args.dataset)
@@ -381,6 +547,14 @@ def main():
     ).to(DEVICE)
     load_checkpoint(world_model, args.checkpoint)
     world_model.eval()
+
+    if args.mode == "symmetry":
+        control_symmetry_test(world_model, episodes,
+                              num_episodes=args.max_episodes,
+                              warmup_steps=args.warmup_steps,
+                              sample_every=args.sample_every,
+                              seed=args.seed)
+        return
 
     for i, ep_idx in enumerate(picks, start=1):
         ep = episodes[ep_idx]

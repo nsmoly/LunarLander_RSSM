@@ -189,11 +189,13 @@ class WorldModel(nn.Module):
         done_logits = self.done_head(feat)     # BCE-with-logits target
         return physics, contact_logits, done_logits
 
+    @staticmethod
+    def make_obs_tensor(physics_pred, contact_logits):
+        return torch.cat([physics_pred, torch.sigmoid(contact_logits)], dim=-1)
+
     def reconstruct_obs(self, h, z):
-        # Keep a compatibility path that returns 8-D obs with contact probabilities.
         physics, contact_logits, _ = self.decode_heads(h, z)
-        contact_probs = torch.sigmoid(contact_logits)
-        return torch.cat([physics, contact_probs], dim=-1)
+        return self.make_obs_tensor(physics, contact_logits)
 
     def predict_reward(self, h, z):
         return self.reward_head(torch.cat([self.rssm.top_hidden(h), z], dim=-1)).squeeze(-1)
@@ -204,34 +206,36 @@ class WorldModel(nn.Module):
 
 
 class Actor(nn.Module):
-    def __init__(self, latent_dim, action_dim, hidden_dim=128):
+    def __init__(self, latent_dim, rssm_hidden_dim, action_dim, actor_hidden_dim=128):
         super().__init__()
+        input_dim = latent_dim + rssm_hidden_dim
         self.net = nn.Sequential(
-            nn.Linear(latent_dim, hidden_dim),
+            nn.Linear(input_dim, actor_hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
+            nn.Linear(actor_hidden_dim, actor_hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
+            nn.Linear(actor_hidden_dim, actor_hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, action_dim),
+            nn.Linear(actor_hidden_dim, action_dim),
         )
 
-    def forward(self, z):
-        logits = self.net(z)
+    def forward(self, h, z):
+        logits = self.net(torch.cat([h, z], dim=-1))
         return torch.distributions.Categorical(logits=logits)
 
 class Critic(nn.Module):
-    def __init__(self, latent_dim, hidden_dim=128):
+    def __init__(self, latent_dim, rssm_hidden_dim, critic_hidden_dim=128):
         super().__init__()
+        input_dim = latent_dim + rssm_hidden_dim
         self.net = nn.Sequential(
-            nn.Linear(latent_dim, hidden_dim),
+            nn.Linear(input_dim, critic_hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
+            nn.Linear(critic_hidden_dim, critic_hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
+            nn.Linear(critic_hidden_dim, critic_hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, 1),
+            nn.Linear(critic_hidden_dim, 1),
         )
 
-    def forward(self, z):
-        return self.net(z).squeeze(-1)
+    def forward(self, h, z):
+        return self.net(torch.cat([h, z], dim=-1)).squeeze(-1)

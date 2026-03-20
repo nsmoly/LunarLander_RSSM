@@ -11,3 +11,5 @@ datasets/**
 plots/
 train_actorcritic_logs*.txt
 train_worldmodel_logs*.txt
+archive/
+archive/**

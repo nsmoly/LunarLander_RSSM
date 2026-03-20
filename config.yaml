@@ -18,7 +18,7 @@ world_model:
   batch_size: 64
   sequence_length: 30
   dataset_seq_offset: 5
-  checkpoint_freq: 10  # Save checkpoint every 100 epochs
+  checkpoint_freq: 10  # Save checkpoint every N epochs
   
 actor_critic:
   action_dim: 4
@@ -26,6 +26,7 @@ actor_critic:
   dataset_seq_offset: 5   # Stride between start positions to reduce overlap
   warmup_steps: 5         # Real observation/action steps to condition RSSM
   imagination_steps: 15   # Latent rollout steps after warmup
+  gamma: 0.99         # Discount factor for GAE returns
   lambda_gae: 0.95   # GAE lambda: 0=1-step TD, 1=full returns, 0.95=typical hybrid
   capacity:
     latent_dim: 16
@@ -39,6 +40,7 @@ actor_critic:
     entropy_final: 0.15   # Lower floor so entropy can settle naturally
   advantage_clip: 0.9
   actor_grad_clip: 1.8
+  critic_grad_clip: 100.0
   collapse_entropy_threshold: 0.10   # Only stop if entropy is truly collapsed
   collapse_actor_grad_threshold: 0.002  # Stop if actor gradients fade
   collapse_max_action_prob_threshold: 0.96  # Detect near-single-action policy

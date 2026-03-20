@@ -112,7 +112,7 @@
                 "--episodes", "20",
                 "--seed", "12345",
                 "--render",
-                "--horizon", "15",
+                "--horizon", "25",
                 "--population", "256",
                 "--elites", "32",
                 "--cem_iters", "4"

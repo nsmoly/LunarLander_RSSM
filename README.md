@@ -1,6 +1,6 @@
-# MoonLander Policy Trained via RSSM World Model (aka DreamerV2-V3)
+# LunarLander Policy Trained via latent RSSM World Model (as in DreamerV2-V3)
 
-Implementation of the latent world model similar to RSSM (DreamerV2-V3) for training the policy for LunarLander RL gym simulation by using model-based reinforcement learning that uses the pretrained latent world model for offline neural rollouts.
+Implementation of the latent world model similar to RSSM (as in DreamerV2-V3) for training the policy for LunarLander RL gym simulation by using model-based reinforcement learning that uses the pretrained latent world model for offline neural rollouts.
 
 ## Workflow
 
