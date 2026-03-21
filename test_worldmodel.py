@@ -200,8 +200,10 @@ def rollout_teacher(world_model, episode):
     next_obs = episode["next_obs"] # length N: s_1..s_N
     actions = episode["actions"]   # length N: a_0..a_{N-1}
     rewards_gt = episode["rewards"]  # length N: r(s_t, a_t)
+    dones_gt = episode["dones"]
     obs_pred = []
     reward_pred = []
+    done_pred = []
 
     with torch.no_grad():
         h = world_model.rssm.init_hidden(1, DEVICE)
@@ -231,16 +233,18 @@ def rollout_teacher(world_model, episode):
             # Decode (h_{t+1}, z_{t+1}) → reconstruct s_{t+1}
             obs_hat = world_model.reconstruct_obs(h, z)
             obs_pred.append(obs_hat.squeeze(0).cpu().numpy())
-            # Reward for transition (s_t, a_t), decoded from post-transition state
             r_hat = world_model.predict_reward(h, z)
             reward_pred.append(r_hat.item())
+            done_logit = world_model.predict_done_logits(h, z)
+            done_pred.append(torch.sigmoid(done_logit).item())
 
-    # obs_pred[t] should match next_obs[t]
     obs_gt_c = next_obs[: len(obs_pred)]
     obs_pred_a = np.asarray(obs_pred, dtype=np.float32)
     reward_pred_a = np.asarray(reward_pred, dtype=np.float32)
     rewards_gt_c = rewards_gt[: len(reward_pred)]
-    return obs_gt_c, obs_pred_a, rewards_gt_c, reward_pred_a
+    dones_gt_c = dones_gt[: len(done_pred)]
+    done_pred_a = np.asarray(done_pred, dtype=np.float32)
+    return obs_gt_c, obs_pred_a, rewards_gt_c, reward_pred_a, dones_gt_c, done_pred_a
 
 
 def rollout_open(world_model, episode):
@@ -254,6 +258,7 @@ def rollout_open(world_model, episode):
     dones = episode["dones"]
     obs_pred = []
     reward_pred = []
+    done_pred = []
 
     with torch.no_grad():
         h = world_model.rssm.init_hidden(1, DEVICE)
@@ -280,17 +285,20 @@ def rollout_open(world_model, episode):
             mean_prior, _ = world_model.rssm.prior(h)
             z = mean_prior
 
-            # Decode (h_{t+1}, z_{t+1}) → reconstruct s_{t+1}, predict r(s_t, a_t)
             obs_hat = world_model.reconstruct_obs(h, z)
             obs_pred.append(obs_hat.squeeze(0).cpu().numpy())
             r_hat = world_model.predict_reward(h, z)
             reward_pred.append(r_hat.item())
+            done_logit = world_model.predict_done_logits(h, z)
+            done_pred.append(torch.sigmoid(done_logit).item())
 
     obs_pred_a = np.asarray(obs_pred, dtype=np.float32) if obs_pred else np.empty((0, obs.shape[1]), dtype=np.float32)
     obs_gt_compare = next_obs[: len(obs_pred)]
     reward_pred_a = np.asarray(reward_pred, dtype=np.float32)
     rewards_gt_c = rewards_gt[: len(reward_pred)]
-    return obs_gt_compare, obs_pred_a, rewards_gt_c, reward_pred_a
+    dones_gt_c = dones[: len(done_pred)]
+    done_pred_a = np.asarray(done_pred, dtype=np.float32)
+    return obs_gt_compare, obs_pred_a, rewards_gt_c, reward_pred_a, dones_gt_c, done_pred_a
 
 
 def rollout_sim(world_model, episode, constant_action):
@@ -495,6 +503,38 @@ def compute_obs_metrics(obs_gt, obs_pred):
     return {"mae": mae, "rmse": rmse}
 
 
+def compute_done_metrics(dones_gt, done_pred_prob, threshold=0.5):
+    if len(dones_gt) == 0 or len(done_pred_prob) == 0:
+        return None
+    n = min(len(dones_gt), len(done_pred_prob))
+    gt = dones_gt[:n].astype(np.float32)
+    prob = done_pred_prob[:n]
+    pred_binary = (prob >= threshold).astype(np.float32)
+
+    accuracy = np.mean(pred_binary == gt)
+    n_positive = int(gt.sum())
+    n_negative = n - n_positive
+
+    tp = int(((pred_binary == 1) & (gt == 1)).sum())
+    fp = int(((pred_binary == 1) & (gt == 0)).sum())
+    fn = int(((pred_binary == 0) & (gt == 1)).sum())
+
+    precision = tp / max(tp + fp, 1)
+    recall = tp / max(tp + fn, 1)
+
+    terminal_prob = float(prob[-1]) if n > 0 else 0.0
+
+    return {
+        "accuracy": accuracy,
+        "precision": precision,
+        "recall": recall,
+        "n_positive": n_positive,
+        "n_negative": n_negative,
+        "tp": tp, "fp": fp, "fn": fn,
+        "terminal_step_prob": terminal_prob,
+    }
+
+
 def load_checkpoint(world_model, checkpoint_path):
     if checkpoint_path and os.path.exists(checkpoint_path):
         world_model.load_state_dict(torch.load(checkpoint_path, map_location=DEVICE))
@@ -567,12 +607,19 @@ def main():
         ep = episodes[ep_idx]
         ep_id = ep["ep_id"]
         if args.mode == "teacher":
-            obs_gt, obs_pred, rewards_gt, reward_pred = rollout_teacher(world_model, ep)
+            obs_gt, obs_pred, rewards_gt, reward_pred, dones_gt, done_pred = rollout_teacher(world_model, ep)
             r_metrics = compute_reward_metrics(rewards_gt, reward_pred)
             o_metrics = compute_obs_metrics(obs_gt, obs_pred)
+            d_metrics = compute_done_metrics(dones_gt, done_pred)
             r_str = f"reward MAE={r_metrics['mae']:.4f} RMSE={r_metrics['rmse']:.4f} sign_acc={r_metrics['sign_acc']:.4f}" if r_metrics else "reward N/A"
             o_str = f"obs MAE={o_metrics['mae']:.4f} RMSE={o_metrics['rmse']:.4f}" if o_metrics else "obs N/A"
-            print(f"Episode {ep_id} (teacher): {r_str} | {o_str}")
+            d_str = (f"done acc={d_metrics['accuracy']:.3f} prec={d_metrics['precision']:.3f} "
+                     f"rec={d_metrics['recall']:.3f} "
+                     f"(tp={d_metrics['tp']} fp={d_metrics['fp']} fn={d_metrics['fn']} "
+                     f"pos={d_metrics['n_positive']} neg={d_metrics['n_negative']}) "
+                     f"terminal_p={d_metrics['terminal_step_prob']:.3f}") if d_metrics else "done N/A"
+            print(f"[Episode {ep_id}] (teacher): {r_str} | {o_str}")
+            print(f"  {d_str}")
             plot_observations(obs_gt, obs_pred, f"Teacher episode {ep_id}",
                               plot_dir=args.plot_dir, filename=f"teacher_{ep_id:03d}.png",
                               rewards_gt=rewards_gt, reward_pred=reward_pred)
@@ -580,12 +627,19 @@ def main():
                 animate_lander(obs_gt, obs_pred, title=f"Teacher ep {ep_id}",
                                plot_dir=args.plot_dir, filename=f"teacher_{ep_id:03d}.mp4")
         elif args.mode == "open":
-            obs_gt, obs_pred, rewards_gt, reward_pred = rollout_open(world_model, ep)
+            obs_gt, obs_pred, rewards_gt, reward_pred, dones_gt, done_pred = rollout_open(world_model, ep)
             r_metrics = compute_reward_metrics(rewards_gt, reward_pred)
             o_metrics = compute_obs_metrics(obs_gt, obs_pred)
+            d_metrics = compute_done_metrics(dones_gt, done_pred)
             r_str = f"reward MAE={r_metrics['mae']:.4f} RMSE={r_metrics['rmse']:.4f} sign_acc={r_metrics['sign_acc']:.4f}" if r_metrics else "reward N/A"
             o_str = f"obs MAE={o_metrics['mae']:.4f} RMSE={o_metrics['rmse']:.4f}" if o_metrics else "obs N/A"
-            print(f"Episode {ep_id} (open): {r_str} | {o_str}")
+            d_str = (f"done acc={d_metrics['accuracy']:.3f} prec={d_metrics['precision']:.3f} "
+                     f"rec={d_metrics['recall']:.3f} "
+                     f"(tp={d_metrics['tp']} fp={d_metrics['fp']} fn={d_metrics['fn']} "
+                     f"pos={d_metrics['n_positive']} neg={d_metrics['n_negative']}) "
+                     f"terminal_p={d_metrics['terminal_step_prob']:.3f}") if d_metrics else "done N/A"
+            print(f"[Episode {ep_id}] (open): {r_str} | {o_str}")
+            print(f"  {d_str}")
             plot_observations(obs_gt, obs_pred, f"Open episode {ep_id}",
                               plot_dir=args.plot_dir, filename=f"open_{ep_id:03d}.png",
                               rewards_gt=rewards_gt, reward_pred=reward_pred)
@@ -595,7 +649,7 @@ def main():
         else:
             obs_pred, prior_stds = rollout_sim(world_model, ep, args.constant_action)
             if prior_stds.size > 0:
-                print(f"Sim ep {ep_id}: prior_std min={prior_stds.min():.4f} median={np.median(prior_stds):.4f} "
+                print(f"[Sim ep {ep_id}]: prior_std min={prior_stds.min():.4f} median={np.median(prior_stds):.4f} "
                       f"mean={prior_stds.mean():.4f} max={prior_stds.max():.4f} (over {prior_stds.size} steps)")
             if args.animate:
                 animate_lander(obs_gt=obs_pred, obs_pred=None, title=f"Sim ep {ep_id}",

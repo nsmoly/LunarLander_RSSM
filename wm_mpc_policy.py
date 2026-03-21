@@ -328,15 +328,21 @@ def main():
                     stop_all = True
                     break
 
+            landed = (len(obs) >= 8 and obs[6] >= 0.5 and obs[7] >= 0.5)
+
             obs_t = torch.tensor(obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
             prev_action_oh = F.one_hot(
                 torch.tensor([prev_action], device=DEVICE), num_classes=action_dim
             ).float()
             with torch.no_grad():
                 h, z, _, _, _, _ = world_model.rssm.step(h, z, prev_action_oh, obs_t)
-                action, best_score, best_step0_reward, best_step0_cost = cem_plan(
-                    world_model, h, z, action_dim, args
-                )
+                if landed:
+                    action = 0
+                    best_score, best_step0_reward, best_step0_cost = 0.0, 0.0, 0.0
+                else:
+                    action, best_score, best_step0_reward, best_step0_cost = cem_plan(
+                        world_model, h, z, action_dim, args
+                    )
 
             planner_steps += 1
             planner_score_sum += float(best_score)
