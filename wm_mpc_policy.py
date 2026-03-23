@@ -124,8 +124,9 @@ def evaluate_action_sequences(world_model, h0, z0, action_sequences, action_dim,
         z = mean_prior
         obs_pred = world_model.reconstruct_obs(h, z)
         reward_pred = world_model.predict_reward(h, z)
-        obs_cost = observation_cost(obs_pred, args)
-        step_score = args.reward_weight * reward_pred - obs_cost
+        step_score = args.reward_weight * reward_pred
+        if args.use_obs_cost:
+            step_score = step_score - observation_cost(obs_pred, args)
         if args.done_penalty > 0.0 and hasattr(world_model, "predict_done_logits"):
             done_prob = torch.sigmoid(world_model.predict_done_logits(h, z))
             step_score = step_score - args.done_penalty * done_prob
@@ -170,9 +171,8 @@ def cem_plan(world_model, h0, z0, action_dim, args):
     z1, _ = world_model.rssm.prior(h1)
     obs1 = world_model.reconstruct_obs(h1, z1)
     reward1 = world_model.predict_reward(h1, z1)
-    cost1 = observation_cost(obs1, args)
     best_step0_reward = float((args.reward_weight * reward1).item())
-    best_step0_cost = float(cost1.item())
+    best_step0_cost = float(observation_cost(obs1, args).item()) if args.use_obs_cost else 0.0
 
     return selected_action, best_score, best_step0_reward, best_step0_cost
 
@@ -238,6 +238,9 @@ def main():
     parser.add_argument("--gamma", type=float, default=0.97, help="Planning discount")
     parser.add_argument("--reward_weight", type=float, default=0.2, help="Weight for predicted reward")
     parser.add_argument("--done_penalty", type=float, default=2.5, help="Penalty for predicted done probability")
+    parser.add_argument("--obs_cost", dest="use_obs_cost", action="store_true",
+                        help="Enable observation cost (default: OFF, use learned rewards only)")
+    parser.set_defaults(use_obs_cost=False)
 
     parser.add_argument("--w_x", type=float, default=1.00, help="Base weight for |x|")
     parser.add_argument("--w_y", type=float, default=0.40, help="Weight for |y| (target y=0)")
@@ -278,7 +281,8 @@ def main():
 
     print(
         "Controls: R toggle render, Q or ESC quit. "
-        "Actions: 0=idle, 1=left side, 2=main, 3=right side"
+        "Actions: 0=idle, 1=left side, 2=main, 3=right side\n"
+        f"obs_cost={'ON' if args.use_obs_cost else 'OFF'}"
     )
 
     run_returns = []
@@ -328,7 +332,8 @@ def main():
                     stop_all = True
                     break
 
-            landed = (len(obs) >= 8 and obs[6] >= 0.5 and obs[7] >= 0.5)
+            landed = (len(obs) >= 8 and obs[6] >= 0.5 and obs[7] >= 0.5
+                      and abs(obs[2]) < 0.05 and abs(obs[3]) < 0.05)
 
             obs_t = torch.tensor(obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
             prev_action_oh = F.one_hot(

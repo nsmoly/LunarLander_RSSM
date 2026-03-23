@@ -153,9 +153,14 @@ def main():
                 elif event.type == KEYDOWN and event.key == K_ESCAPE:
                     running = False
 
+            landed = (len(obs) >= 8 and obs[6] >= 0.5 and obs[7] >= 0.5
+                      and abs(obs[2]) < 0.05 and abs(obs[3]) < 0.05)
+
             action_dist = actor(h, z)
             probs = action_dist.probs.squeeze(0).detach().cpu().numpy()
-            if args.deterministic:
+            if landed:
+                action = 0
+            elif args.deterministic:
                 action = int(np.argmax(probs))
             else:
                 action = action_dist.sample().item()
