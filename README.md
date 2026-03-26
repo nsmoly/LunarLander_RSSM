@@ -1,12 +1,22 @@
-# LunarLander Policy Trained via latent RSSM World Model (as in DreamerV2-V3)
+# LunarLander Policy Trained via latent RSSM World Model (similar to DreamerV2-V3)
 
-Implementation of the latent world model similar to RSSM (as in DreamerV2-V3) for training the policy for LunarLander RL gym simulation by using model-based reinforcement learning that uses the pretrained latent world model for offline neural rollouts.
+Implementation of the latent world model similar to RSSM (similar to DreamerV2-V3) for training the policy for LunarLander RL gym simulation by using model-based reinforcement learning that uses the pretrained latent world model for offline neural rollouts.
 
 ![Moonlander WorldModel Based Zero-shot MPC Policy](moonlander_mpc_1.jpg)
 
 ## Workflow
 
-1. **Collect** → 2. **Train World Model** → 3. **Test World Model** → 4. **Train Actor-Critic** → 5. **Test Policy**
+**World-model-based path** (model-based RL):
+
+1. **Collect Dataset** → 2. **Train World Model** → 3. **Test World Model** → 4. **Train Actor-Critic (WM-based)** → 5. **Test Policy**
+
+**Model-free path** (baseline comparison):
+
+1. **Train Model-Free Actor-Critic** → 2. **Test Policy**
+
+**MPC path** (no actor needed):
+
+1. **Collect Dataset** → 2. **Train World Model** → 3. **WM MPC Policy (CEM)**
 
 ---
 
@@ -117,9 +127,9 @@ python test_worldmodel.py --mode teacher --checkpoint world_model.pt --max_episo
 
 ---
 
-## 5. Train Actor-Critic
+## 5. Train Actor-Critic (WM-based)
 
-Train the policy (actor) and value function (critic) via imagined rollouts in latent space. Requires a trained world model.
+Train the policy (actor) and value function (critic) via imagined rollouts in the world model's latent space. Requires a trained world model. This is the model-based RL approach.
 
 ```bash
 # Basic usage
@@ -140,26 +150,32 @@ Config: `horizon`, `past_horizon`, `future_horizon` (must satisfy P+F=H), `batch
 
 ---
 
-## 6. Test Actor-Critic (Policy)
+## 6. Test Policy
 
-Run the trained policy in the LunarLander environment. Loads world model and actor from config-matched checkpoints.
+Run a trained policy in the LunarLander environment. Supports both WM-based (latent) and model-free (obs) actors.
 
 ```bash
-# Default: world_model.pt (or world_model_good.pt), actor.pt
-python test_policy.py
+# Test WM-based actor (requires world model + latent actor)
+python test_policy.py --actor_type latent --world_model world_model.pt --actor actor.pt --episodes 20
 
-# Specify checkpoints
-python test_policy.py --world_model world_model_good.pt --actor actor.pt
+# Test model-free actor (no world model needed)
+python test_policy.py --actor_type obs --actor checkpoints/actor_mf_20260324_230139_epoch_750.pt --episodes 20
 
-# Use config for model dimensions
-python test_policy.py --config config.yaml
+# Stochastic action sampling instead of deterministic argmax
+python test_policy.py --actor_type obs --actor checkpoints/actor_mf_20260324_230139_epoch_750.pt --stochastic
 ```
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--config` | `config.yaml` | Config for latent_dim, hidden_dim, action_dim |
-| `--world_model` | `world_model.pt` | World model checkpoint (fallback: world_model_good.pt) |
-| `--actor` | `actor.pt` | Actor checkpoint |
+| `--actor_type` | `latent` | `latent` (WM-based, uses RSSM) or `obs` (model-free, raw observations) |
+| `--config` | `config.yaml` | Config for model dimensions |
+| `--world_model` | `world_model.pt` | World model checkpoint (only for `latent` actor) |
+| `--actor` | `actor.pt` / `actor_mf.pt` | Actor checkpoint (default depends on `--actor_type`) |
+| `--episodes` | 20 | Number of episodes to run |
+| `--max_steps` | 600 | Max steps per episode |
+| `--deterministic` | *(default)* | Use argmax action selection |
+| `--stochastic` | | Sample actions from the policy distribution |
+| `--seed` | 12345 | Random seed for reproducibility |
 
 ---
 
@@ -186,17 +202,54 @@ Useful knobs:
 
 ---
 
+## 8. Train Model-Free Actor-Critic (Baseline)
+
+Train a policy directly from on-policy environment interactions without a world model. Uses the same A2C algorithm (GAE, entropy regularization) as the WM-based trainer, but operates on raw observations instead of latent states. Serves as a baseline for comparing sample efficiency and compute cost against the world-model-based approach.
+
+```bash
+# Train from scratch
+python train_modelfree_actorcritic.py --seed 12345
+
+# Resume from latest checkpoint
+python train_modelfree_actorcritic.py --resume --seed 12345
+
+# Train with rendering (slower, shows one episode per epoch)
+python train_modelfree_actorcritic.py --render --seed 12345
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--epochs` | 1000 | Number of training epochs |
+| `--episodes_per_epoch` | 50 | On-policy episodes collected per epoch |
+| `--max_steps` | 600 | Max steps per episode |
+| `--lr` | 3e-4 | Learning rate (AdamW) |
+| `--gamma` | 0.99 | Discount factor |
+| `--lambda_gae` | 0.95 | GAE lambda |
+| `--entropy_coeff` | 0.2 | Initial entropy coefficient |
+| `--entropy_coeff_end` | 0.01 | Final entropy coefficient (linearly decayed) |
+| `--hidden_dim` | 256 | Hidden dim for ActorObs / CriticObs |
+| `--checkpoint_freq` | 10 | Save checkpoints every N epochs |
+| `--resume` | | Resume from latest `actor_mf` / `critic_mf` checkpoint pair |
+| `--render` | | Render one episode per epoch |
+| `--seed` | 12345 | Random seed |
+
+Checkpoints are saved as `actor_mf_<date>_<time>_epoch_<N>.pt` and `critic_mf_<date>_<time>_epoch_<N>.pt`. Training logs are written to `train_modelfree_actorcritic_logs.txt`.
+
+---
+
 ## Sample Files (Checked In)
 
-The repository includes sample datasets and a trained world model and actor-critic checkpoints in the root folder:
+The repository includes sample datasets and trained checkpoints:
 
 | File | Description |
 |------|--------------|
-| `lunarlander_train_dataset.npz` | Sample training dataset |
-| `lunarlander_val_dataset.npz` | Sample validation dataset |
-| `world_model.pt` | Pretrained world model checkpoint (140 epoch) |
-| `actor.pt` | Pretrained world model checkpoint (130 epoch) |
-| `critic.pt` | Pretrained world model checkpoint (130 epoch) |
+| `lunarlander_train_dataset.npz` | Training dataset (750 episodes) |
+| `lunarlander_val_dataset.npz` | Validation dataset (122 episodes) |
+| `world_model.pt` | Pretrained world model checkpoint (epoch 200) |
+| `actor.pt` | WM-based actor checkpoint (epoch 750) |
+| `critic.pt` | WM-based critic checkpoint (epoch 750) |
+| `actor_mf.pt` | Model-free actor checkpoint (best, epoch 750) |
+| `critic_mf.pt` | Model-free critic checkpoint (epoch 750) |
 
 Use `--checkpoint world_model.pt` when testing the world model.
 
@@ -204,7 +257,7 @@ Use `--checkpoint world_model.pt` when testing the world model.
 ## Quick Reference
 
 ```bash
-# Full pipeline
+# World-model-based pipeline
 python collect_dataset.py --dataset lunarlander_train_dataset.npz --seed 12345
 python replay_dataset.py --dataset lunarlander_train_dataset.npz --episodes 5
 
@@ -212,37 +265,39 @@ python train_models.py --phase world_model --train_dataset lunarlander_train_dat
 python test_worldmodel.py --mode open --max_episodes 2 --plot_dir plots
 
 python train_models.py --phase actor_critic --train_dataset lunarlander_train_dataset.npz
-python test_policy.py
+python test_policy.py --actor_type latent --world_model world_model.pt --actor actor.pt --episodes 20
+
+# MPC (no actor needed, uses world model directly)
+python wm_mpc_policy.py --config config.yaml --world_model world_model.pt --render --episodes 20
+
+# Model-free baseline
+python train_modelfree_actorcritic.py --seed 12345
+python test_policy.py --actor_type obs --actor checkpoints/actor_mf.pt --episodes 20
 ```
 
 ---
 
-## Release Notes for V3 Version of WorldModel/RSSM in this Repo
+## Notes on important details that make this version working
 
-This release introduced a focused world-model refactor that significantly improved closed-loop MPC behavior in `wm_mpc_policy.py`, especially near touchdown.
-
-### What changed
-
-- **Decoder redesign to multi-head outputs**:
+- **Decoder design to multi-head outputs**:
   - Shared decoder backbone from `[h, z]`
   - Physics head (6 continuous dims: `x, y, vx, vy, angle, ang_vel`)
   - Contact head (2 binary dims: leg contacts)
   - Done head (1 binary dim)
-- **Loss redesign to match output types**:
+- **Loss design to match output types**:
   - Physics: MSE
   - Contact: BCE-with-logits
   - Done: BCE-with-logits
   - (plus existing reward and KL terms)
-- **Model capacity/activation updates**:
-  - `latent_dim=16`, `hidden_dim=256`, `mlp_hidden_dim=256`
-  - `Linear -> LayerNorm -> SiLU` in all key world-model MLP blocks
-- **Posterior input decision finalized**:
+- **Model design**:
+  - `Linear -> LayerNorm -> SiLU` are good setup for physics modelling
+- **Posterior design**:
   - Posterior uses `obs_t` only, while `done` is a training target (predicted).
 
-### Why these changes mattered
+### Why these choices matter
 
-- The main gain came from **separating continuous and binary prediction heads/losses**, which reduced blurry terminal/contact dynamics and improved landing quality under MPC optimizer.
-- Capacity changes (reduced capacity) and normalization (LinearNorm) / activation (SiLU) changes further improved optimization stability, but the decoder/loss split was probably the biggest contributor. The training now converges to a good working world model by epoch 10. No dataset expansion was needed.
+- The main gain comes from **separating continuous and binary prediction heads/losses**, which reduced blurry terminal/contact dynamics and improved landing quality under MPC optimizer.
+- Capacity, normalization (LinearNorm) and activation (SiLU) changes further improve optimization stability. 
 
 ### Checkpoint selection notes
 
@@ -252,8 +307,9 @@ This release introduced a focused world-model refactor that significantly improv
 - Metrics like best late-stage observation RMSE alone were less predictive of MPC closed-loop quality.
 MAE metrics were not that informative since they don't account for outliers as well as RMSE metrics.
 
-### Checkpoints: working world_model.pt, actor.pt and critic.pt checkpoints are in the repo
+### Checkpoints in the repo
 
-- WorldModel checkpoint (world_model.pt) is for epoch 200
-- AC RL Policy checkpoints (actor.pt and critic.pt) are for epoch 750
-- Also the repo has a world_model_random.pt checkpoint with random weights to compare with and poorly trained AC RL policy in actor_earlyBad_ep50.pt
+- WorldModel checkpoint (`world_model.pt`) is for epoch 200
+- WM-based AC policy checkpoints (`actor.pt` and `critic.pt`) are for epoch 750
+- Model-free AC policy checkpoints (`actor_mf_*_epoch_750.pt` and `critic_mf_*_epoch_750.pt`) are for epoch 750 (best model-free checkpoint)
+- Also the repo has a `world_model_random.pt` checkpoint with random weights to compare with and a also poorly trained AC policy in `actor_earlyBad_ep50.pt` to test

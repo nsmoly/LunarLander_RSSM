@@ -9,7 +9,8 @@ dataset/**
 datasets/
 datasets/**
 plots/
-train_actorcritic_logs*.txt
 train_worldmodel_logs*.txt
+train_actorcritic_logs*.txt
+train_modelfree_actorcritic_logs*.txt
 archive/
 archive/**

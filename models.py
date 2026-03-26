@@ -245,3 +245,40 @@ class Critic(nn.Module):
 
     def forward(self, h, z):
         return self.net(torch.cat([h, z], dim=-1)).squeeze(-1)
+
+
+class ActorObs(nn.Module):
+    """Actor that operates directly on raw observations (model-free RL)."""
+    def __init__(self, obs_dim, action_dim, hidden_dim=256):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(obs_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, action_dim),
+        )
+
+    def forward(self, obs):
+        logits = self.net(obs)
+        return torch.distributions.Categorical(logits=logits)
+
+
+class CriticObs(nn.Module):
+    """Critic that operates directly on raw observations (model-free RL)."""
+    def __init__(self, obs_dim, hidden_dim=256):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(obs_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 1),
+        )
+
+    def forward(self, obs):
+        return self.net(obs).squeeze(-1)

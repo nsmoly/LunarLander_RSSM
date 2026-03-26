@@ -15,7 +15,7 @@ import gymnasium.envs.box2d.lunar_lander as lunar_lander_module
 import pygame
 from pygame.locals import K_ESCAPE, QUIT, KEYDOWN
 
-from models import WorldModel, Actor
+from models import WorldModel, Actor, ActorObs
 
 lunar_lander_module.VIEWPORT_W = 600
 lunar_lander_module.VIEWPORT_H = 400
@@ -46,7 +46,9 @@ def main():
     parser.add_argument("--world_model", default=None,
                         help="World model checkpoint (default: world_model.pt)")
     parser.add_argument("--actor", default=None,
-                        help="Actor checkpoint (default: actor.pt)")
+                        help="Actor checkpoint (default: actor.pt for latent, actor_mf.pt for obs)")
+    parser.add_argument("--actor_type", choices=["latent", "obs"], default="latent",
+                        help="Actor type: 'latent' uses RSSM (h,z), 'obs' uses raw observations")
     parser.add_argument("--seed", type=int, default=12345, help="Random seed for reproducibility")
     parser.add_argument("--episodes", type=int, default=20, help="Number of episodes to run")
     parser.add_argument("--max_steps", type=int, default=600, help="Max steps per episode")
@@ -67,6 +69,7 @@ def main():
     args = parser.parse_args()
 
     latent_dim, hidden_dim, mlp_hidden_dim, gru_num_layers, action_dim = load_config(args.config)
+    use_wm_actor = (args.actor_type == "latent")
 
     env = gym.make("LunarLander-v3", render_mode="human")
     
@@ -78,35 +81,40 @@ def main():
     env.action_space.seed(args.seed)
     obs_dim = env.observation_space.shape[0]
 
-    world_model = WorldModel(
-        obs_dim,
-        action_dim,
-        latent_dim=latent_dim,
-        hidden_dim=hidden_dim,
-        gru_num_layers=gru_num_layers,
-        mlp_hidden_dim=mlp_hidden_dim,
-    ).to(DEVICE)
-    actor = Actor(latent_dim=latent_dim, rssm_hidden_dim=hidden_dim,
-                  action_dim=action_dim, actor_hidden_dim=mlp_hidden_dim).to(DEVICE)
+    world_model = None
+    if use_wm_actor:
+        world_model = WorldModel(
+            obs_dim,
+            action_dim,
+            latent_dim=latent_dim,
+            hidden_dim=hidden_dim,
+            gru_num_layers=gru_num_layers,
+            mlp_hidden_dim=mlp_hidden_dim,
+        ).to(DEVICE)
+        wm_path = args.world_model or "world_model.pt"
+        if not os.path.exists(wm_path):
+            print(f"Warning: {wm_path} not found!")
+            return
+        world_model.load_state_dict(torch.load(wm_path, map_location=DEVICE))
+        print(f"Loaded world model from {wm_path}")
+        world_model.eval()
 
-    wm_path = args.world_model or "world_model.pt"
-    if not os.path.exists(wm_path):
-        print(f"Warning: {wm_path} not found!")
-        return
-    world_model.load_state_dict(torch.load(wm_path, map_location=DEVICE))
-    print(f"Loaded world model from {wm_path}")
+        actor = Actor(latent_dim=latent_dim, rssm_hidden_dim=hidden_dim,
+                      action_dim=action_dim, actor_hidden_dim=mlp_hidden_dim).to(DEVICE)
+    else:
+        actor = ActorObs(obs_dim, action_dim, hidden_dim=mlp_hidden_dim).to(DEVICE)
 
-    actor_path = args.actor or "actor.pt"
+    actor_path = args.actor or ("actor.pt" if use_wm_actor else "actor_mf.pt")
     if not os.path.exists(actor_path):
         print(f"Warning: {actor_path} not found!")
         return
     actor.load_state_dict(torch.load(actor_path, map_location=DEVICE))
-    print(f"Loaded actor from {actor_path}")
+    print(f"Loaded actor ({args.actor_type}) from {actor_path}")
 
-    world_model.eval()
     actor.eval()
     mode_str = "deterministic (argmax)" if args.deterministic else "stochastic (sample)"
     print(f"Action selection mode: {mode_str}")
+    print(f"Actor type: {args.actor_type}")
     print(f"Seed: {args.seed}, Episodes: {args.episodes}")
 
     # ---- Run-level accumulators ----
@@ -123,17 +131,18 @@ def main():
     with torch.no_grad():
         episode_idx = 0
 
-        def init_rssm_state(obs_np):
-            h = world_model.rssm.init_hidden(1, DEVICE)
-            z_prev = torch.zeros(1, world_model.rssm.latent_dim, device=DEVICE)
-            a_prev = torch.zeros(1, action_dim, device=DEVICE)
-            h = world_model.rssm.update_hidden(h, z_prev, a_prev)
-            obs_t = torch.tensor(obs_np, dtype=torch.float32, device=DEVICE).unsqueeze(0)
-            mean_post, logstd_post = world_model.rssm.posterior(h, obs_t)
-            z = mean_post if args.deterministic else world_model.rssm.sample_latent(mean_post, logstd_post)
-            return h, z
-
-        h, z = init_rssm_state(obs)
+        h, z = None, None
+        if use_wm_actor:
+            def init_rssm_state(obs_np):
+                h = world_model.rssm.init_hidden(1, DEVICE)
+                z_prev = torch.zeros(1, world_model.rssm.latent_dim, device=DEVICE)
+                a_prev = torch.zeros(1, action_dim, device=DEVICE)
+                h = world_model.rssm.update_hidden(h, z_prev, a_prev)
+                obs_t = torch.tensor(obs_np, dtype=torch.float32, device=DEVICE).unsqueeze(0)
+                mean_post, logstd_post = world_model.rssm.posterior(h, obs_t)
+                z = mean_post if args.deterministic else world_model.rssm.sample_latent(mean_post, logstd_post)
+                return h, z
+            h, z = init_rssm_state(obs)
 
         # ---- Episode-level accumulators ----
         total_reward = 0.0
@@ -156,7 +165,11 @@ def main():
             landed = (len(obs) >= 8 and obs[6] >= 0.5 and obs[7] >= 0.5
                       and abs(obs[2]) < 0.05 and abs(obs[3]) < 0.05)
 
-            action_dist = actor(h, z)
+            obs_t = torch.tensor(obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
+            if use_wm_actor:
+                action_dist = actor(h, z)
+            else:
+                action_dist = actor(obs_t)
             probs = action_dist.probs.squeeze(0).detach().cpu().numpy()
             if landed:
                 action = 0
@@ -186,13 +199,14 @@ def main():
 
             obs = next_obs
 
-            a_onehot = torch.nn.functional.one_hot(
-                torch.tensor([action], device=DEVICE), num_classes=action_dim
-            ).float()
-            h = world_model.rssm.update_hidden(h, z, a_onehot)
-            obs_t = torch.tensor(next_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
-            mean_post, logstd_post = world_model.rssm.posterior(h, obs_t)
-            z = mean_post if args.deterministic else world_model.rssm.sample_latent(mean_post, logstd_post)
+            if use_wm_actor:
+                a_onehot = torch.nn.functional.one_hot(
+                    torch.tensor([action], device=DEVICE), num_classes=action_dim
+                ).float()
+                h = world_model.rssm.update_hidden(h, z, a_onehot)
+                obs_t = torch.tensor(next_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
+                mean_post, logstd_post = world_model.rssm.posterior(h, obs_t)
+                z = mean_post if args.deterministic else world_model.rssm.sample_latent(mean_post, logstd_post)
 
             env.render()
             clock.tick(lunar_lander_module.FPS)
@@ -250,7 +264,8 @@ def main():
                 entropy_sum = 0.0
                 touchdown_snapshot = None
                 obs, _ = env.reset(seed=args.seed + episode_idx)
-                h, z = init_rssm_state(obs)
+                if use_wm_actor:
+                    h, z = init_rssm_state(obs)
 
     # ---- Run Summary (after all episodes) ----
     if run_episode_count > 0:

@@ -74,10 +74,42 @@
             "justMyCode": false
         },
         {
-            "name": "Test Policy",
+            "name": "Train Model-Free Actor-Critic",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/train_modelfree_actorcritic.py",
+            "args": [
+                "--seed", "12345"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Test Policy (WM Actor)",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/test_policy.py",
+            "args": [
+                "--actor_type", "latent",
+                "--world_model", "world_model.pt",
+                "--actor", "actor.pt",
+                "--episodes", "20",
+                "--seed", "12345"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Test Policy (Model-Free Actor)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/test_policy.py",
+            "args": [
+                "--actor_type", "obs",
+                "--actor", "actor_mf.pt",
+                "--episodes", "20",
+                "--seed", "12345"
+            ],
             "console": "integratedTerminal",
             "justMyCode": false
         },
