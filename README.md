@@ -1,6 +1,6 @@
-# LunarLander Policy Trained via latent RSSM World Model (similar to DreamerV2-V3)
+# LunarLander Policy Trained via Latent World Model (similar to RSSM in DreamerV2-V3)
 
-Implementation of the latent world model similar to RSSM (similar to DreamerV2-V3) for training the policy for LunarLander RL gym simulation by using model-based reinforcement learning that uses the pretrained latent world model for offline neural rollouts.
+Implementation of the latent world model similar to RSSM (DreamerV2-V3) for training the policy for LunarLander-V3 gymnasium simulation by using model-based reinforcement learning that uses the pretrained latent world model for offline neural rollouts. The repo also has a zero-shot learning MPC (model predictive control) based policy that uses the trained world model for rollouts to compute optimal actions. I also added a model-free RL policy (actor-critic) for comparisson. World model based approach are much more data efficient and use 120x LESS data compared to the model-free RL policy (uses gymnasium sim environment for rollouts during training). All 3 methods - MPC with world model policy, world model based RL policy and model-free RL policy reach similar performance during gymnasium sim testing (similar rewards). The repo also includes test code which can be used to evaluate if a trained world model checkpoint is fully trained and can support RL or MPC.
 
 ![Moonlander WorldModel Based Zero-shot MPC Policy](moonlander_mpc_1.jpg)
 
