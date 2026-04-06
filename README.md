@@ -309,7 +309,7 @@ MAE metrics were not that informative since they don't account for outliers as w
 
 ### Checkpoints in the repo
 
-- WorldModel checkpoint (`world_model.pt`) is for epoch 200
+- WorldModel checkpoint (`world_model.pt`) is for epoch 295
 - WM-based AC policy checkpoints (`actor.pt` and `critic.pt`) are for epoch 750
 - Model-free AC policy checkpoints (`actor_mf_*_epoch_750.pt` and `critic_mf_*_epoch_750.pt`) are for epoch 750 (best model-free checkpoint)
 - Also the repo has a `world_model_random.pt` checkpoint with random weights to compare with and a also poorly trained AC policy in `actor_earlyBad_ep50.pt` to test

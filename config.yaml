@@ -18,15 +18,22 @@ world_model:
     reward: 1.2
     kl: 1.0
     done: 0.5
-  epochs: 200
-  val_freq: 10
+  epochs: 500
+  val_freq: 5
   lr: 0.0001
   beta_kl: 0.5
   batch_size: 64
   sequence_length: 30
   dataset_seq_offset: 5
-  checkpoint_freq: 10  # Save checkpoint every N epochs
-  
+  checkpoint_freq: 5  # Save checkpoint every N epochs
+  obs_structure:
+    physics_dim: 6    # Continuous physics dims (x, y, vx, vy, angle, ang_vel)
+    contact_dim: 2    # Binary contact dims (left leg, right leg)
+
+metrics:
+  warmup_steps: 5       # Posterior warmup steps before open-loop rollout
+  planning_horizon: 25  # Open-loop rollout horizon (should match CEM --horizon)
+
 actor_critic:
   action_dim: 4
   sequence_length: 5

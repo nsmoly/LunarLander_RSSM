@@ -265,8 +265,6 @@ def main():
     if args.y_near_temp <= 0.0:
         raise ValueError("y_near_temp must be > 0")
 
-    set_seed(args.seed)
-
     env = gym.make("LunarLander-v3", render_mode="rgb_array")
     obs, _ = env.reset(seed=args.seed)
     obs_dim = env.observation_space.shape[0]
@@ -278,6 +276,10 @@ def main():
     font = pygame.font.SysFont("consolas", 18)
     clock = pygame.time.Clock()
     render_enabled = bool(args.render and screen is not None)
+
+    # Seed AFTER all init so CEM sampling is deterministic regardless of
+    # how many random numbers gym/model-init consumed above.
+    set_seed(args.seed)
 
     print(
         "Controls: R toggle render, Q or ESC quit. "
@@ -298,6 +300,7 @@ def main():
     stop_all = False
     for ep in range(1, args.episodes + 1):
         obs, _ = env.reset(seed=args.seed + ep)
+        set_seed(args.seed + ep)
         done = False
         ep_return = 0.0
         prev_action = 0
