@@ -1,6 +1,6 @@
 # LunarLander Policy Trained via Latent World Model (similar to RSSM in DreamerV2-V3)
 
-Implementation of the latent world model similar to RSSM (DreamerV2-V3) for training the policy for LunarLander-V3 gymnasium simulation by using model-based reinforcement learning that uses the pretrained latent world model for offline neural rollouts. The repo also has a zero-shot learning MPC (model predictive control) based policy that uses the trained world model for rollouts to compute optimal actions. I also added a model-free RL policy (actor-critic) for comparisson. World model based approach are much more data efficient and use 120x LESS data compared to the model-free RL policy (uses gymnasium sim environment for rollouts during training). All 3 methods - MPC with world model policy, world model based RL policy and model-free RL policy reach similar performance during gymnasium sim testing (similar rewards). The repo also includes test code which can be used to evaluate if a trained world model checkpoint is fully trained and can support RL or MPC.
+Implementation of the latent world model similar to RSSM (DreamerV2-V3) for training the policy for LunarLander-V3 gymnasium simulation by using model-based reinforcement learning that uses the pretrained latent world model for offline neural rollouts. The repo also has a zero-shot learning MPC (model predictive control) based policy that uses the trained world model for rollouts to compute optimal actions. I also added a model-free RL policy (actor-critic) for comparison. World-model-based approaches are much more data efficient: both MPC and world-model-based AC reach a strong policy using only the offline dataset (~181K real env transitions across 872 episodes), whereas the model-free RL policy needs ~8.0M real env transitions to reach its best policy — roughly **44× more environment interaction**. All three methods reach competitive performance on the real LunarLander environment (mean returns of $+168.7$ for MPC, $+129.4$ for WM-based AC, $+179.4$ for model-free AC). The repo includes a sweep script (`eval_rl.py`) for systematically evaluating actor-critic checkpoints. A separate validation-time metrics suite — used to select world-model checkpoints without ever touching the real environment — is described in the accompanying paper (forthcoming) and will be released alongside it.
 
 ![Moonlander WorldModel Based Zero-shot MPC Policy](moonlander_mpc_1.jpg)
 
@@ -152,17 +152,20 @@ Config: `horizon`, `past_horizon`, `future_horizon` (must satisfy P+F=H), `batch
 
 ## 6. Test Policy
 
-Run a trained policy in the LunarLander environment. Supports both WM-based (latent) and model-free (obs) actors.
+Run a trained policy in the LunarLander environment. Supports both WM-based (latent) and model-free (obs) actors. Runs **headless by default** for fast evaluation; pass `--render` to open a Pygame window with a stats overlay (episode, return, action probs, entropy, FPS). At the end of the run, a scorecard summary is printed (mean/worst return, perfect/negative/catastrophic counts, avg entropy, avg steps).
 
 ```bash
-# Test WM-based actor (requires world model + latent actor)
+# Test WM-based actor headless (requires world model + latent actor)
 python test_policy.py --actor_type latent --world_model world_model.pt --actor actor.pt --episodes 20
 
-# Test model-free actor (no world model needed)
-python test_policy.py --actor_type obs --actor checkpoints/actor_mf_20260324_230139_epoch_750.pt --episodes 20
+# Test model-free actor headless (no world model needed)
+python test_policy.py --actor_type obs --actor actor_mf.pt --episodes 20
+
+# Watch with rendering (window with overlay; press R to toggle, Q/ESC to quit)
+python test_policy.py --actor_type latent --world_model world_model.pt --actor actor.pt --render --render_fps 30
 
 # Stochastic action sampling instead of deterministic argmax
-python test_policy.py --actor_type obs --actor checkpoints/actor_mf_20260324_230139_epoch_750.pt --stochastic
+python test_policy.py --actor_type obs --actor actor_mf.pt --stochastic
 ```
 
 | Option | Default | Description |
@@ -173,9 +176,13 @@ python test_policy.py --actor_type obs --actor checkpoints/actor_mf_20260324_230
 | `--actor` | `actor.pt` / `actor_mf.pt` | Actor checkpoint (default depends on `--actor_type`) |
 | `--episodes` | 20 | Number of episodes to run |
 | `--max_steps` | 600 | Max steps per episode |
+| `--render` | off | Open a Pygame window with stats overlay during rollout |
+| `--render_fps` | 30.0 | Visual FPS cap when rendering (sleep-based throttle) |
 | `--deterministic` | *(default)* | Use argmax action selection |
 | `--stochastic` | | Sample actions from the policy distribution |
 | `--seed` | 12345 | Random seed for reproducibility |
+
+Render-window keyboard controls: `R` toggles rendering on/off, `Q`/`ESC` quits.
 
 ---
 
@@ -237,19 +244,66 @@ Checkpoints are saved as `actor_mf_<date>_<time>_epoch_<N>.pt` and `critic_mf_<d
 
 ---
 
+## 9. Sweep Actor-Critic Checkpoints (`eval_rl.py`)
+
+Run `test_policy.py` as a subprocess for every actor checkpoint in a folder and aggregate the results into a single log. Supports both WM-based AC (`--actor_type latent`, requires `--world_model`) and model-free AC (`--actor_type obs`).
+
+```bash
+# WM-based AC sweep (CROF-selected world model held fixed)
+python eval_rl.py \
+    --checkpoints_dir checkpoints \
+    --actor_type latent \
+    --world_model world_model.pt \
+    --output rl_eval_logs.txt
+
+# Model-free AC sweep (no world model)
+python eval_rl.py \
+    --checkpoints_dir checkpoints \
+    --actor_type obs \
+    --epoch_stride 5 \
+    --output rl_eval_logs_mfAC.txt
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--checkpoints_dir` | *(required)* | Folder containing actor checkpoints |
+| `--actor_type` | *(required)* | `latent` (WM-based) or `obs` (model-free) |
+| `--world_model` | None | World model checkpoint (required when `--actor_type latent`) |
+| `--actor_pattern` | `actor.*epoch_(\d+)\.pt$` | Regex matching actor filenames; group 1 must be the integer epoch |
+| `--episodes` | 20 | Episodes per checkpoint |
+| `--seed` | 12345 | Random seed (passed through to `test_policy.py`) |
+| `--max_steps` | 600 | Max steps per episode (matches MPC sweep) |
+| `--epoch_min` | None | Skip checkpoints below this epoch |
+| `--epoch_max` | None | Skip checkpoints above this epoch |
+| `--epoch_stride` | 1 | Take every N-th checkpoint (use 5 for model-free actors saved every 10 epochs) |
+| `--output` | `rl_eval_logs.txt` | Output log file |
+| `--config` | `config.yaml` | Path to config |
+| `--append` | off | Append to output instead of overwriting |
+| `--top_k` | 10 | Print top-K checkpoints by mean return at the end |
+
+Runs are deterministic at the given seed. The sweep produces:
+- a per-checkpoint scorecard block (full `test_policy.py` stdout) for each actor
+- a sweep summary table (sorted by epoch) listing mean/worst return, perfect/negative/catastrophic counts, avg steps, avg entropy
+- a top-K table sorted by mean return
+- a `Best by mean_return` line identifying the winning checkpoint
+
+This is the script used in the paper to compare WM-based AC (trained with WM 295), WM-based AC (trained with WM 200), and the model-free AC baseline.
+
+---
+
 ## Sample Files (Checked In)
 
 The repository includes sample datasets and trained checkpoints:
 
 | File | Description |
 |------|--------------|
-| `lunarlander_train_dataset.npz` | Training dataset (750 episodes) |
-| `lunarlander_val_dataset.npz` | Validation dataset (122 episodes) |
-| `world_model.pt` | Pretrained world model checkpoint (epoch 200) |
-| `actor.pt` | WM-based actor checkpoint (epoch 750) |
-| `critic.pt` | WM-based critic checkpoint (epoch 750) |
-| `actor_mf.pt` | Model-free actor checkpoint (best, epoch 750) |
-| `critic_mf.pt` | Model-free critic checkpoint (epoch 750) |
+| `lunarlander_train_dataset.npz` | Training dataset (750 episodes, 158,685 transitions) |
+| `lunarlander_val_dataset.npz` | Validation dataset (122 episodes, 22,231 transitions) |
+| `world_model.pt` | Pretrained world model checkpoint — **epoch 295** (CROF-selected safe peak; MPC mean +168.65, worst-case +3.82) |
+| `actor.pt` | WM-based actor checkpoint — **epoch 200** (peak deterministic mean return +129.42 over 20 episodes) |
+| `critic.pt` | WM-based critic checkpoint — **epoch 200** (paired with the actor above) |
+| `actor_mf.pt` | Model-free actor checkpoint — **epoch 610** (peak deterministic mean return +179.44 over 20 episodes) |
+| `critic_mf.pt` | Model-free critic checkpoint — **epoch 610** (paired with the actor above) |
 
 Use `--checkpoint world_model.pt` when testing the world model.
 
@@ -272,7 +326,11 @@ python wm_mpc_policy.py --config config.yaml --world_model world_model.pt --rend
 
 # Model-free baseline
 python train_modelfree_actorcritic.py --seed 12345
-python test_policy.py --actor_type obs --actor checkpoints/actor_mf.pt --episodes 20
+python test_policy.py --actor_type obs --actor actor_mf.pt --episodes 20
+
+# Sweep all actor-critic checkpoints in a folder (WM-based or model-free)
+python eval_rl.py --checkpoints_dir checkpoints --actor_type latent --world_model world_model.pt --output rl_eval_logs.txt
+python eval_rl.py --checkpoints_dir checkpoints --actor_type obs --epoch_stride 5 --output rl_eval_logs_mfAC.txt
 ```
 
 ---
@@ -301,15 +359,13 @@ python test_policy.py --actor_type obs --actor checkpoints/actor_mf.pt --episode
 
 ### Checkpoint selection notes
 
-- In training logs, the most informative metrics for MPC checkpoint ranking were:
-  - **validation loss (`val_loss`)**
-  - **reward RMSE (`reward_rmse`)**
-- Metrics like best late-stage observation RMSE alone were less predictive of MPC closed-loop quality.
-MAE metrics were not that informative since they don't account for outliers as well as RMSE metrics.
+- Standard training-time metrics (validation loss, reward RMSE, multi-step open-loop RMSE) all keep improving monotonically past the point of best MPC performance, and pick deeply overfit checkpoints (epoch ≥460) where MPC closed-loop return has collapsed. MAE-based variants are even less informative because they suppress the rare large prediction errors that matter for control.
+- A separate set of validation-time *structural* metrics — Jacobian-based Reward Observability Fraction averaged over curated "good" and "bad" states, plus controllability/observability rank fractions and multi-step observation RMSE, combined into a composite score (CROF) — turn out to be the strongest predictors of MPC return (best Spearman ρ ≈ −0.71 in our sweep) and select checkpoints inside the high-MPC plateau without ever touching the real environment. Epoch 295 was selected via this procedure.
+- The full analysis (definitions, sweeps, and selection results) will be published with the accompanying paper. The `world_model.pt` checkpoint shipped here is the one selected by that procedure.
 
 ### Checkpoints in the repo
 
-- WorldModel checkpoint (`world_model.pt`) is for epoch 295
-- WM-based AC policy checkpoints (`actor.pt` and `critic.pt`) are for epoch 750
-- Model-free AC policy checkpoints (`actor_mf_*_epoch_750.pt` and `critic_mf_*_epoch_750.pt`) are for epoch 750 (best model-free checkpoint)
-- Also the repo has a `world_model_random.pt` checkpoint with random weights to compare with and a also poorly trained AC policy in `actor_earlyBad_ep50.pt` to test
+- **World model** (`world_model.pt`): **epoch 295**, the CROF-selected "safe peak" — highest mean MPC return inside the high-quality plateau ($+168.65$) and the only checkpoint in the plateau with a non-negative worst-case episode ($+3.82$).
+- **WM-based AC** (`actor.pt` + `critic.pt`): **epoch 200**, the peak of the AC sweep when trained on world model epoch 295. Real-env mean return $+129.42$ over 20 deterministic episodes (8/20 perfect landings).
+- **Model-free AC** (`actor_mf.pt` + `critic_mf.pt`): **epoch 610**, the peak of the model-free sweep. Real-env mean return $+179.44$ over 20 deterministic episodes (12/20 perfect landings, 0 catastrophic), trained on $\approx 8.0$M real environment transitions.
+- Older actor/critic checkpoints (e.g., `actor_ep750.pt`, `critic_ep750.pt`) are kept for reproducibility of earlier experiments. Full checkpoint sweeps live under `archive/`.

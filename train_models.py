@@ -97,6 +97,7 @@ class SequenceDataset(Dataset):
         # We use this to sample sequences from the dataset.
         self.episode_ids = np.unique(self.ep_index)
         self.episode_indices = []
+        self.episode_returns = []
         self.start_positions = []
         for ep_id in self.episode_ids:
             data_idxs = np.where(self.ep_index == ep_id)[0]
@@ -106,8 +107,14 @@ class SequenceDataset(Dataset):
             data_idxs = data_idxs[order]
             ep_pos = len(self.episode_indices)
             self.episode_indices.append(data_idxs)
+            self.episode_returns.append(float(self.rewards[data_idxs].sum()))
             for pos in range(0, len(data_idxs), self.dataset_seq_offset):
                 self.start_positions.append((ep_pos, pos))
+        self.episode_returns = np.array(self.episode_returns)
+        self.seq_ep_return = np.array([
+            self.episode_returns[ep_pos]
+            for ep_pos, _ in self.start_positions
+        ])
 
     def __len__(self):
         return len(self.start_positions)
@@ -141,6 +148,15 @@ class SequenceDataset(Dataset):
                 break
 
         return obs_seq, actions_seq, rewards_seq, next_obs_seq, dones_seq, mask
+
+    def get_filtered_indices(self, min_return=None, max_return=None):
+        """Return sequence indices whose source episode return is in [min, max]."""
+        mask = np.ones(len(self.start_positions), dtype=bool)
+        if min_return is not None:
+            mask &= self.seq_ep_return >= min_return
+        if max_return is not None:
+            mask &= self.seq_ep_return <= max_return
+        return np.where(mask)[0]
 
 
 # -----------------------------------------------------------------------------
