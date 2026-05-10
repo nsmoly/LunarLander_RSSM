@@ -8,23 +8,16 @@
 #
 # Usage examples:
 #
-#   # New WM-based AC (trained with WM epoch 295)
+#   # WM-based AC (trained with world model)
 #   python eval_rl.py \
-#       --checkpoints_dir archive/V4_good_landing_extendedTrainingBest_04022026/checkpoints_actorcritic \
+#       --checkpoints_dir checkpoints \
 #       --actor_type latent \
-#       --world_model archive/V4_good_landing_extendedTrainingBest_04022026/checkpoints_worldmodel/world_model_20260331_092643_epoch_295.pt \
+#       --world_model checkpoints/world_model_epoch_<N>.pt \
 #       --output rl_eval_logs_newAC.txt
-#
-#   # Old WM-based AC (trained with WM epoch 200)
-#   python eval_rl.py \
-#       --checkpoints_dir archive/V4_good_landing_afterRSSMFixes_03182026/checkpoints_ac_v4_AfterRSSMFixes_03182026 \
-#       --actor_type latent \
-#       --world_model archive/V4_good_landing_afterRSSMFixes_03182026/checkpoints_wm_v4_AfterRSSMFixes_03182026/world_model_20260318_105750_epoch_200.pt \
-#       --output rl_eval_logs_oldAC.txt
 #
 #   # Model-free AC
 #   python eval_rl.py \
-#       --checkpoints_dir archive/V4_good_landing_afterRSSMFixes_03182026/checkpoints_acmf_v4_modelfreeAdd_03262026 \
+#       --checkpoints_dir checkpoints_actorcritic_modelfree \
 #       --actor_type obs \
 #       --output rl_eval_logs_mfAC.txt
 # ===========================================================================

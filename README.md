@@ -1,6 +1,6 @@
 # LunarLander Policy Trained via Latent World Model (similar to RSSM in DreamerV2-V3)
 
-Implementation of the latent world model similar to RSSM (DreamerV2-V3) for training the policy for LunarLander-V3 gymnasium simulation by using model-based reinforcement learning that uses the pretrained latent world model for offline neural rollouts. The repo also has a zero-shot learning MPC (model predictive control) based policy that uses the trained world model for rollouts to compute optimal actions. I also added a model-free RL policy (actor-critic) for comparison. World-model-based approaches are much more data efficient: both MPC and world-model-based AC reach a strong policy using only the offline dataset (~181K real env transitions across 872 episodes), whereas the model-free RL policy needs ~8.0M real env transitions to reach its best policy — roughly **44× more environment interaction**. All three methods reach competitive performance on the real LunarLander environment (mean returns of $+168.7$ for MPC, $+129.4$ for WM-based AC, $+179.4$ for model-free AC). The repo includes a sweep script (`eval_rl.py`) for systematically evaluating actor-critic checkpoints. A separate validation-time metrics suite — used to select world-model checkpoints without ever touching the real environment — is described in the accompanying paper (forthcoming) and will be released alongside it.
+Implementation of the latent world model similar to RSSM (DreamerV2-V3) for training the policy for LunarLander-V3 gymnasium simulation by using model-based reinforcement learning that uses the pretrained latent world model for offline neural rollouts. The repo also has a zero-shot learning MPC (model predictive control) based policy that uses the trained world model for rollouts to compute optimal actions. I also added a model-free RL policy (actor-critic) for comparison. World-model-based approaches are much more data efficient: both MPC and world-model-based AC reach a strong policy using only the offline dataset (~181K real env transitions across 872 episodes), whereas the model-free RL policy needs ~11.8M real env transitions to reach its peak — roughly **65× more environment interaction**. Peak mean returns over 100 deterministic episodes: $+217.5$ for WM-based AC, $+193.0$ for model-free AC, $+166.6$ for MPC. The repo includes a sweep script (`eval_rl.py`) for systematically evaluating actor-critic checkpoints. A separate validation-time metrics suite (CROF) — used to select world-model checkpoints without ever touching the real environment — is described in the accompanying paper (forthcoming) and will be released alongside it.
 
 ![Moonlander WorldModel Based Zero-shot MPC Policy](moonlander_mpc_1.jpg)
 
@@ -287,7 +287,7 @@ Runs are deterministic at the given seed. The sweep produces:
 - a top-K table sorted by mean return
 - a `Best by mean_return` line identifying the winning checkpoint
 
-This is the script used in the paper to compare WM-based AC (trained with WM 295), WM-based AC (trained with WM 200), and the model-free AC baseline.
+This is the script used in the paper to evaluate WM-based AC (trained with the CROF-selected world model, WM 280) and the model-free AC baseline; the full paper sweep covers 9 world-model checkpoints with 100 deterministic episodes per actor save (`--episodes 100`).
 
 ---
 
@@ -299,11 +299,11 @@ The repository includes sample datasets and trained checkpoints:
 |------|--------------|
 | `lunarlander_train_dataset.npz` | Training dataset (750 episodes, 158,685 transitions) |
 | `lunarlander_val_dataset.npz` | Validation dataset (122 episodes, 22,231 transitions) |
-| `world_model.pt` | Pretrained world model checkpoint — **epoch 295** (CROF-selected safe peak; MPC mean +168.65, worst-case +3.82) |
-| `actor.pt` | WM-based actor checkpoint — **epoch 200** (peak deterministic mean return +129.42 over 20 episodes) |
-| `critic.pt` | WM-based critic checkpoint — **epoch 200** (paired with the actor above) |
-| `actor_mf.pt` | Model-free actor checkpoint — **epoch 610** (peak deterministic mean return +179.44 over 20 episodes) |
-| `critic_mf.pt` | Model-free critic checkpoint — **epoch 610** (paired with the actor above) |
+| `world_model.pt` | Pretrained world model checkpoint — **epoch 280** (raw min CROF, both CROF-A and CROF-B variants) |
+| `actor.pt` | WM-based actor checkpoint — **epoch 800** (best-by-mean A2C save trained on WM 280; mean +217.5 over 100 deterministic episodes, 79/100 perfect, 2/100 catastrophic) |
+| `critic.pt` | WM-based critic checkpoint — **epoch 800** (paired with the actor above) |
+| `actor_mf.pt` | Model-free actor checkpoint — **epoch 760** (peak of the model-free sweep; mean +193.0 over 100 deterministic episodes, 54/100 perfect, 0/100 catastrophic) |
+| `critic_mf.pt` | Model-free critic checkpoint — **epoch 760** (paired with the actor above) |
 
 Use `--checkpoint world_model.pt` when testing the world model.
 
@@ -360,12 +360,12 @@ python eval_rl.py --checkpoints_dir checkpoints --actor_type obs --epoch_stride 
 ### Checkpoint selection notes
 
 - Standard training-time metrics (validation loss, reward RMSE, multi-step open-loop RMSE) all keep improving monotonically past the point of best MPC performance, and pick deeply overfit checkpoints (epoch ≥460) where MPC closed-loop return has collapsed. MAE-based variants are even less informative because they suppress the rare large prediction errors that matter for control.
-- A separate set of validation-time *structural* metrics — Jacobian-based Reward Observability Fraction averaged over curated "good" and "bad" states, plus controllability/observability rank fractions and multi-step observation RMSE, combined into a composite score (CROF) — turn out to be the strongest predictors of MPC return (best Spearman ρ ≈ −0.71 in our sweep) and select checkpoints inside the high-MPC plateau without ever touching the real environment. Epoch 295 was selected via this procedure.
+- A separate set of validation-time *structural* metrics — Jacobian-based Reward Observability Fraction averaged over curated "good" and "bad" states, plus controllability/observability rank fractions and multi-step observation RMSE, combined into a composite score (CROF) — turn out to be the strongest predictors of MPC return (best Spearman ρ ≈ −0.71 in our sweep) and select checkpoints inside the high-MPC plateau without ever touching the real environment. Epoch 280 was selected via this procedure (raw minimum of both CROF-A and CROF-B).
 - The full analysis (definitions, sweeps, and selection results) will be published with the accompanying paper. The `world_model.pt` checkpoint shipped here is the one selected by that procedure.
 
 ### Checkpoints in the repo
 
-- **World model** (`world_model.pt`): **epoch 295**, the CROF-selected "safe peak" — highest mean MPC return inside the high-quality plateau ($+168.65$) and the only checkpoint in the plateau with a non-negative worst-case episode ($+3.82$).
-- **WM-based AC** (`actor.pt` + `critic.pt`): **epoch 200**, the peak of the AC sweep when trained on world model epoch 295. Real-env mean return $+129.42$ over 20 deterministic episodes (8/20 perfect landings).
-- **Model-free AC** (`actor_mf.pt` + `critic_mf.pt`): **epoch 610**, the peak of the model-free sweep. Real-env mean return $+179.44$ over 20 deterministic episodes (12/20 perfect landings, 0 catastrophic), trained on $\approx 8.0$M real environment transitions.
-- Older actor/critic checkpoints (e.g., `actor_ep750.pt`, `critic_ep750.pt`) are kept for reproducibility of earlier experiments. Full checkpoint sweeps live under `archive/`.
+- **World model** (`world_model.pt`): **epoch 280**, the CROF-selected world-model checkpoint (raw minimum of both CROF-A and CROF-B variants). Identifiable purely from offline validation-time diagnostics — no real-environment evaluation needed.
+- **WM-based AC** (`actor.pt` + `critic.pt`): **epoch 800**, the best-by-mean A2C save when trained on world model epoch 280. Real-env mean return $+217.5$ over 100 deterministic episodes (79/100 perfect landings, 2/100 catastrophic).
+- **Model-free AC** (`actor_mf.pt` + `critic_mf.pt`): **epoch 760**, the peak of the model-free sweep. Real-env mean return $+193.0$ over 100 deterministic episodes (54/100 perfect landings, 0/100 catastrophic), trained on $\approx 11.8$M real environment transitions to reach its peak.
+- Older actor/critic checkpoints are kept for reproducibility of earlier experiments. Full checkpoint sweeps live under `archive/`.
