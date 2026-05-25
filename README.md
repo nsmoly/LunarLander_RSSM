@@ -1,7 +1,8 @@
 # LunarLander Policy Trained via Latent World Model (similar to RSSM in DreamerV2-V3)
 
 > **TL;DR.** This repository studies an RSSM-style latent world model for LunarLander-v3: it trains the world model, runs CEM-based MPC with it, trains a model-based A2C policy in latent imagination, trains a model-free A2C baseline, compares all three, and investigates how to pick the best world-model checkpoint for closed-loop use from offline diagnostics alone using Jacobian-based metrics we propose. 
-Full write-up is in the accompanying white paper: [`WorldModel_LunarLander_20260525.pdf`](./WorldModel_LunarLander_20260525.pdf).
+**Full white paper describing it is here:** [`Structural Diagnostics for Latent World Models:
+A LunarLander Case Study of Offline Checkpoint Selection for MPC and Model-based Actor-Critic Policy`](./WorldModel_LunarLander_20260525.pdf).
 
 ## Details
 
