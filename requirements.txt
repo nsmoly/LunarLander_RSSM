@@ -1,1 +1,34 @@
-torch>=2.0.0
+# Python: 3.9.13 (tested).  Any 3.9.x is expected to work; 3.10+ is untested
+# for the pinned torch 1.12.1 wheel below.
+#
+# PyTorch: paper results were produced with torch==1.12.1 + CUDA 11.6.
+# This CUDA-specific wheel is not on PyPI, so install it FIRST from the
+# PyTorch archive index BEFORE running `pip install -r requirements.txt`:
+#
+#   pip install torch==1.12.1+cu116 torchvision==0.13.1+cu116 torchaudio==0.12.1+cu116 \
+#       --extra-index-url https://download.pytorch.org/whl/cu116
+#
+# CPU-only alternative (slow; not what the paper used):
+#   pip install torch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1
+#
+# The `torch` line below is intentionally a loose bound so `pip install -r`
+# does not overwrite the CUDA wheel installed above. Newer torch versions
+# (up to 2.x) are expected to work but were not used for the paper.
+
+# Deep learning
+torch>=1.12,<3.0
+
+# Core numerics
+numpy==1.23.3
+scipy==1.9.1
+scikit-learn==1.1.2
+
+# Environment / simulator (LunarLander-v3 needs the box2d extra)
+gymnasium[box2d]==1.1.1
+pygame==2.1.2
+
+# Config / IO
+PyYAML==6.0.3
+
+# Visualization
+matplotlib==3.6.0
