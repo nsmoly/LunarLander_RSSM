@@ -1,8 +1,6 @@
 # LunarLander Policy Trained via Latent World Model (similar to RSSM in DreamerV2-V3)
 
-> **TL;DR.** This repository studies an RSSM-style latent world model for LunarLander-v3: it trains the world model, runs CEM-based MPC with it, trains a model-based A2C policy in latent imagination, trains a model-free A2C baseline, compares all three, and investigates how to pick the best world-model checkpoint for closed-loop use from offline diagnostics alone using Jacobian-based metrics we propose. 
-**Full white paper describing it is here:** [`Predicting Closed-Loop Performance of Latent World Models:
-Offline Checkpoint Selection for MPC and Model-Based RL Under Non-Markovian Rewards in LunarLander`](./WorldModel_LunarLander_CROF_2026.pdf).
+> **TL;DR.** This repository studies an RSSM-style latent world model for LunarLander-v3: it trains the world model, runs CEM-based MPC with it, trains a model-based A2C policy in latent imagination, trains a model-free A2C baseline, compares all three, and investigates how to pick the best world-model checkpoint for closed-loop use from offline diagnostics alone using Jacobian-based metrics we propose.
 
 ## Details
 
@@ -23,6 +21,10 @@ The repository contains a complete pipeline. A latent world model (RSSM-style, a
 **MPC path** (no actor needed):
 
 1. **Collect Dataset** → 2. **Train World Model** → 3. **WM MPC Policy (CEM)**
+
+**Imitation path** (no world model, no reward):
+
+1. **Collect Dataset** → 2. **Train Behaviour Cloning Policy** → 3. **Test Policy** (with `--stochastic`)
 
 ---
 
@@ -297,6 +299,58 @@ This is the script used in the paper to evaluate WM-based AC (trained with the C
 
 ---
 
+## 10. Train Behaviour Cloning Policy (Imitation Baseline)
+
+Train a policy to imitate successful human landings directly, with no world model, no critic, and no reward signal. Episodes are filtered by total return, and the actor is fit by cross-entropy against the human's discrete action at each observed state. Serves as an imitation-learning baseline for comparing data efficiency and closed-loop quality against MPC and the actor-critic paths.
+
+Reuses `ActorObs` from `models.py` unchanged, so the resulting checkpoint loads in `test_policy.py --actor_type obs` with no extra flags.
+
+```bash
+# Train on all successful landings (return >= 200)
+python train_bc_policy.py --min_return 200 --epochs 60
+
+# Restrict the demonstration budget (for data-efficiency sweeps)
+python train_bc_policy.py --min_return 200 --n_episodes 50
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--dataset` | `lunarlander_train_dataset.npz` | Offline human demonstration dataset |
+| `--min_return` | 200.0 | Keep episodes whose total return is at least this |
+| `--n_episodes` | all | Use only this many demonstration episodes |
+| `--val_frac` | 0.1 | Held-out fraction, split by episode rather than transition |
+| `--epochs` | 50 | Number of training epochs |
+| `--batch_size` | 256 | Minibatch size |
+| `--lr` | 1e-3 | Learning rate (AdamW, cosine-annealed) |
+| `--hidden_dim` | 256 | Must match `world_model.capacity.mlp_hidden_dim`, which is what `test_policy.py` uses to rebuild the actor |
+| `--checkpoint_freq` | 5 | Snapshot every N epochs (0 disables) |
+| `--out` | `checkpoints/actor_bc.pt` | Best-validation checkpoint |
+| `--save_final` | | Also write the last-epoch weights to this path |
+| `--seed` | 12345 | Random seed |
+
+Per-epoch snapshots are saved as `checkpoints/actor_bc_<date>_<time>_epoch_<N>.pt`, matching the naming used by `train_modelfree_actorcritic.py`. The best-validation checkpoint is written separately to `--out`.
+
+### Evaluate with `--stochastic`, not the default
+
+```bash
+python test_policy.py --actor_type obs --actor checkpoints/actor_bc.pt --episodes 20 --stochastic
+```
+
+**`test_policy.py` defaults to `--deterministic` (argmax), which is the wrong read-out for this policy.** On identical weights over 20 episodes at seed 12345:
+
+| Action selection | Mean return | Worst | Perfect | Never landed |
+|------------------|-------------|-------|---------|--------------|
+| `--stochastic` | **+185.6** | −190.8 | 15/20 | 1/20 |
+| `--deterministic` | −190.2 | −681.5 | 2/20 | 4/20 |
+
+Human keyboard control is duty-cycle control: the demonstrations fire the main engine on 42.3% of steps because the pilot pulses the key, so the firing *rate* is the control signal. Sampling reproduces that rate and matches the human's episode length to within 2%. Argmax does not, in two ways that compound. It over-commits the main engine, and more damagingly it deletes minority actions entirely — the side thrusters are only ~7% of human actions and so are rarely the mode, giving episodes where the lander fires no lateral thruster at all and cannot correct drift. A deterministic memoryless policy can also enter a limit cycle it never escapes, which is what the four never-landed episodes are.
+
+The general rule: behaviour cloning's guarantee is that matching the expert's conditional action *distribution* matches the expert's state occupancy, and that guarantee attaches to the stochastic policy. Determinising it yields a policy that was never the thing being fit.
+
+Validation cross-entropy is also a poor proxy for closed-loop return here — it bottoms out around epoch 9 while the epoch-60 weights still score +142 — so the per-epoch snapshots are worth sweeping rather than trusting the loss curve to pick a checkpoint.
+
+---
+
 ## Sample Files (Checked In)
 
 The repository includes sample datasets and trained checkpoints:
@@ -333,6 +387,10 @@ python wm_mpc_policy.py --config config.yaml --world_model world_model.pt --rend
 # Model-free baseline
 python train_modelfree_actorcritic.py --seed 12345
 python test_policy.py --actor_type obs --actor actor_mf.pt --episodes 20
+
+# Behaviour cloning baseline (note: --stochastic is required at eval time)
+python train_bc_policy.py --min_return 200 --epochs 60
+python test_policy.py --actor_type obs --actor checkpoints/actor_bc.pt --episodes 20 --stochastic
 
 # Sweep all actor-critic checkpoints in a folder (WM-based or model-free)
 python eval_rl.py --checkpoints_dir checkpoints --actor_type latent --world_model world_model.pt --output rl_eval_logs.txt
