@@ -17,12 +17,12 @@ archive/**
 paper/*
 !paper/main.tex
 !paper/references.bib
+!paper/make_revision_figures.py
 !paper/figures/
 paper/figures/*
 !paper/figures/moonlander_mpc_1.jpg
 !paper/figures/mpc_all_runs.png
 !paper/figures/zonly_rof.png
-!paper/figures/two_env_rho.png
 !paper/figures/zonly3080_mpc.png
 reacher_rssm/
 reacher_rssm/**
