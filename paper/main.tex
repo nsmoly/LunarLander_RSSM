@@ -34,11 +34,11 @@ Jonathan Shock\\
 \maketitle
 \begingroup
 \renewcommand{\thefootnote}{}
-\footnotetext{\textbf{Note on this revision.} The first version claimed that ROF, and a composite (CROF), predict closed-loop performance and can select checkpoints offline. \textbf{Those claims are withdrawn.} Collapse is a property of individual training runs, and neither ROF nor any other offline statistic we tested predicts it (Section~\ref{sec:negative}). This version keeps the world-model and control results, states the Fisher-support theorem for ROF (Section~\ref{sec:rof}), and reports the tests that remain after a change of latent coordinates (Section~\ref{sec:validity}).}
+\footnotetext{\textbf{Note on this revision.} The first version claimed that ROF, and a composite (CROF), predict closed-loop performance and can select checkpoints offline. \textbf{Those claims are withdrawn.} Collapse varies between training runs with the same data and configuration, and neither ROF nor any other offline statistic we tested predicts it (Section~\ref{sec:negative}). This version keeps the world-model and control results, states the Fisher-support theorem for ROF (Section~\ref{sec:rof}), and reports the tests that remain after a change of latent coordinates (Section~\ref{sec:validity}).}
 \endgroup
 
 \begin{abstract}
-We study the closed-loop properties of an RSSM~\cite{hafner2019planet,hafner2020dreamer} world model trained on human demonstrations in Gymnasium's LunarLander-v3 environment. We use the trained world model for zero-shot CEM model-predictive control (MPC) and for actor--critic (A2C) training in imagination. The model-based A2C policy reaches a mean return of $+217.5$, against $+193.0$ for a model-free A2C baseline, using ${\sim}65\times$ fewer real training transitions (${\sim}12\times$ fewer when the closed-loop sweep used to choose the world-model checkpoint is counted). We also compare world-model MPC with a behaviour-cloning (BC) policy trained on the successful demonstrations. The BC policy matches MPC's mean return only under stochastic action selection, and it has a worse tail. We then introduce the Reward Observability Fraction (ROF), the Euclidean fraction of the reward gradient that lies in the observable subspace of the linearized latent dynamics. That subspace is the Fisher-information support of the next $H$ observations. ROF itself is a ratio of Euclidean norms, so it is a readout in the model's trained coordinates and is not invariant to rescaling the latent. Forcing the reward head to read only the posterior-corrected latent $\bm{z}$ raises it; we do not treat raw levels as comparable across models. Finally, we test whether ROF or other offline metrics can predict the closed-loop collapse of MPC. Collapse is a property of individual training runs, and neither ROF nor any of the other $108$ offline statistics we screened predicts it. Offline prediction of planner behavior from the model and the data alone remains open.
+We study the closed-loop properties of an RSSM~\cite{hafner2019planet,hafner2020dreamer} world model trained on human demonstrations in Gymnasium's LunarLander-v3 environment. We use the trained world model for zero-shot CEM model-predictive control (MPC) and for actor--critic (A2C) training in imagination. The selected model-based A2C policy (trained on world-model checkpoint $280$) reaches a mean return of $+217.5$, against $+193.0$ for the best model-free A2C checkpoint (both chosen on their evaluation episodes, with $600$- and $1000$-step episode caps respectively), using ${\sim}65\times$ fewer real training transitions. We also compare world-model MPC with a behaviour-cloning (BC) policy trained on the successful demonstrations. The BC policy matches MPC's mean return only under stochastic action selection, and on the same $20$ episodes it has one catastrophic episode where MPC has none. We then introduce the Reward Observability Fraction (ROF), the Euclidean fraction of the reward gradient that lies in the observable subspace of the linearized latent dynamics. That subspace is the Fisher-information support of the next $H$ observations. ROF itself is a ratio of Euclidean norms, so it is a readout in the model's trained coordinates and is not invariant to rescaling the latent. Forcing the reward head to read only the posterior-corrected latent $\bm{z}$ raises it; we do not treat raw levels as comparable across models. Finally, we test whether ROF or other offline metrics can predict the closed-loop collapse of MPC. Collapse varies between training runs with identical data and configuration. ROF does not predict it, none of the $108$ offline summaries we screened passes a permutation test, and the best candidate fails on new runs. Offline prediction of planner behaviour from the model and the data alone remains open.
 \end{abstract}
 
 %==========================================================================
@@ -48,17 +48,10 @@ We study the closed-loop properties of an RSSM~\cite{hafner2019planet,hafner2020
 
 Model-based reinforcement learning promises to reduce
 the number of real-environment interactions needed to learn effective policies
-by building a predictive model of the environment---a \emph{world model}---and
+by building a predictive model of the environment, a \emph{world model}, and
 using it for planning or policy optimization in imagination.
 The Dreamer or Recurrent State Space Model (RSSM) architecture~\cite{hafner2019planet,hafner2020dreamer}
 has become a standard backbone for world models, enabling both online planning via Model Predictive Control (MPC)~\cite{hafner2019planet} and policy learning with Reinforcement Learning (RL) through imagined rollouts~\cite{hafner2020dreamer,hafner2023dreamerv3}.
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.55\textwidth]{figures/moonlander_mpc_1.jpg}
-\caption{LunarLander-v3: four discrete actions (NOP, left/main/right thruster), $8$-D observation, soft-landing objective from a randomized initial state.}
-\label{fig:lander}
-\end{figure}
 
 A fundamental challenge in model-based RL is
 \emph{objective mismatch}~\cite{lambert2020objective}:
@@ -66,9 +59,9 @@ the training objective for the world model (prediction accuracy) does not
 necessarily align with the downstream objective (closed-loop performance).
 We see this directly: on LunarLander, validation loss and multi-step prediction error keep improving while the closed-loop return of CEM-MPC on the same checkpoints may rise, peak and then collapse.
 
-We focus on LunarLander-v3. Its $8$-dimensional observation and $4$ discrete actions are small enough to admit direct structural analysis of the learned latent, and its reward is not recoverable from the current observation and action alone, because of potential-based shaping plus terminal events gated by simulator-internal flags (Section~\ref{sec:reward-predictability}).
+We focus on LunarLander-v3, in which a lander must touch down softly on a pad from a randomized initial state (Appendix~\ref{sec:app-env}). Its $8$-dimensional observation and $4$ discrete actions are small enough to admit direct structural analysis of the learned latent, and its reward is not recoverable from the current observation and action alone, because of potential-based shaping plus terminal events gated by simulator-internal flags (Section~\ref{sec:reward-predictability}).
 
-Our contributions are: (i) a world model trained on human demonstrations for LunarLander, used for CEM-MPC and imagination-trained A2C, and compared with model-free A2C and behaviour cloning (Section~\ref{sec:closed-loop}); (ii) the Reward Observability Fraction (ROF) and a proof that its observable subspace is the Fisher-information support of the next observations (Section~\ref{sec:rof}); (iii) a $z$-only reward-head test: ROF moves when the head is forced onto the posterior-corrected latent, and this is the geometry result that survives a change of coordinates (Section~\ref{sec:validity}); and (iv) a negative result: collapse is decided per training run, and no offline statistic we tested, ROF included, predicts it (Section~\ref{sec:negative}).
+Our contributions are: (i) a world model trained on human demonstrations for LunarLander, used for CEM-MPC and imagination-trained A2C, and compared with model-free A2C and behaviour cloning (Section~\ref{sec:closed-loop}); (ii) the Reward Observability Fraction (ROF), with the short argument that its observable subspace is exactly the support of the Fisher information the next observations carry about the latent state (Section~\ref{sec:rof}); (iii) a $z$-only reward-head test: ROF moves when the head is forced onto the posterior-corrected latent, and this is the geometry result that survives a change of coordinates (Section~\ref{sec:validity}); and (iv) a negative result: collapse differs between training runs with identical data and configuration, and no offline statistic we tested, ROF included, predicts it (Section~\ref{sec:negative}).
 
 %==========================================================================
 \section{Related Work}
@@ -76,16 +69,16 @@ Our contributions are: (i) a world model trained on human demonstrations for Lun
 %==========================================================================
 
 \paragraph{World models and model-based RL.}
-The RSSM family --- PlaNet~\cite{hafner2019planet}, Dreamer~\cite{hafner2020dreamer}, and DreamerV3~\cite{hafner2023dreamerv3} --- learns latent dynamics for planning and imagination-based actor--critic training; PETS~\cite{chua2018pets} pairs probabilistic ensemble dynamics with MPC. These methods train by maximizing prediction likelihood and evaluate by downstream task performance.
+The RSSM family (PlaNet~\cite{hafner2019planet}, Dreamer~\cite{hafner2020dreamer} and DreamerV3~\cite{hafner2023dreamerv3}) learns latent dynamics for planning and imagination-based actor--critic training; PETS~\cite{chua2018pets} pairs probabilistic ensemble dynamics with MPC. These methods train by maximizing prediction likelihood and evaluate by downstream task performance.
 
 \paragraph{Objective mismatch and model selection.}
 Lambert et al.~\cite{lambert2020objective} showed that optimizing a dynamics model for prediction accuracy does not guarantee good closed-loop performance. Decision-aware objectives such as value-aware model learning~\cite{farahmand2017vaml} change the training loss instead. For choosing among already-trained models, offline model-based RL has relied on validation loss and off-policy evaluation; Yang et al.~\cite{yang2026boms} argue that both are unreliable under distribution shift and select dynamics models with a small online budget instead, in the spirit of active offline policy selection~\cite{konyushova2021active}. Our negative result (Section~\ref{sec:negative}) is consistent with that conclusion, reached independently.
 
 \paragraph{Model exploitation.}
-Planners and policies exploit model error: MOPO~\cite{yu2020mopo} and MOReL~\cite{kidambi2020morel} penalize model uncertainty during policy optimization, and Sims et al.~\cite{sims2024edge} show that truncated model rollouts can drive value overestimation and collapse even with an exact dynamics model. We test planner-side accounts of this kind directly (Section~\ref{sec:negative-tests}).
+Planners and policies exploit model error: MOPO~\cite{yu2020mopo} and MOReL~\cite{kidambi2020morel} penalize model uncertainty during policy optimization, and Sims et al.~\cite{sims2024edge} show that truncated model rollouts can drive value overestimation and collapse even with an exact dynamics model. We probe several planner-side explanations of this kind in Section~\ref{sec:negative-tests}.
 
 \paragraph{Representations, control theory and Fisher information.}
-DeepMDP~\cite{gelada2019deepmdp}, SOLAR~\cite{zhang2019solar} and contrastive behavioural embeddings~\cite{agarwal2021contrastive} shape the representation at training time; we instead analyze a trained model post hoc, with tools that go back to Kalman's controllability and observability~\cite{kalman1963mathematical}, Moore's balanced realizations~\cite{moore1981principal}, and local Jacobian analysis of trained recurrent networks~\cite{sussillo2013opening}. The link between observability and the Fisher information of a linear-Gaussian measurement model is classical~\cite{kay1993fundamentals,anderson1979optimal}; Section~\ref{sec:fisher} states the form we need, which concerns the support of that information rather than its magnitude.
+DeepMDP~\cite{gelada2019deepmdp}, SOLAR~\cite{zhang2019solar} and contrastive behavioural embeddings~\cite{agarwal2021contrastive} shape the representation at training time; we instead analyse a trained model post hoc, with tools that go back to Kalman's controllability and observability~\cite{kalman1963mathematical}, Moore's balanced realizations~\cite{moore1981principal}, and local Jacobian analysis of trained recurrent networks~\cite{sussillo2013opening}. The link between observability and the Fisher information of a linear-Gaussian measurement model is classical~\cite{kay1993fundamentals,anderson1979optimal}; Section~\ref{sec:fisher} states the form we need, which concerns the support of that information rather than its magnitude.
 
 %==========================================================================
 \section{Method}
@@ -105,22 +98,7 @@ We use an RSSM-inspired world model~\cite{hafner2020dreamer,hafner2023dreamerv3}
 \end{equation}
 the posterior encoder is $q_\theta(\bm{z}_t \mid \bm{h}_t, \bm{o}_t)$, and both prior and posterior are 2-layer MLPs (LayerNorm + SiLU) predicting mean and log-std of a diagonal Gaussian; the observation encoder is a 2-layer MLP mapping $\bm{o}_t \in \R^8$ to a feature vector concatenated with $\bm{h}_t$ for the posterior. Note that the posterior corrects only $\bm{z}_t$: the deterministic path $\bm{h}_t$ receives observations only through the $\bm{z}$ it is fed.
 
-\paragraph{Structured decoder with heterogeneous heads.}
-Rather than treating all 8 observation dimensions identically, the decoder uses a shared 2-layer MLP backbone (LayerNorm + SiLU, input $d_h{+}d_z{=}272$) feeding four heads: an MSE-regression \emph{physics} head ($\R^6$, continuous states), a BCE \emph{contact} head ($\R^2$ logits, sigmoid at inference), a BCE \emph{done} head ($\R^1$), and a separate 3-layer \emph{reward} MLP ($\R^{272}{\to}256{\to}256{\to}1$) that operates directly on $[\bm{h};\bm{z}]$ rather than the shared backbone, so the reward predictor develops its own representation without competing with reconstruction for backbone capacity. The observation decoder is $\hat{\bm{o}}_t = g_\theta(\bm{s}_t)$ (physics concatenated with sigmoid of contact logits); the reward predictor is $\hat{r}_t = \rho_\theta(\bm{s}_t)$.
-
-\paragraph{Training loss.} The total loss is a weighted sum:
-\begin{equation}
-  \mathcal{L} = w_r \mathcal{L}_{\text{recon}} + w_\rho \mathcal{L}_{\text{rew}}
-    + w_d \mathcal{L}_{\text{done}} + w_{\text{KL}} \, \mathcal{L}_{\text{KL}},
-  \label{eq:loss}
-\end{equation}
-with weights $w_r{=}1.0$, $w_\rho{=}1.2$, $w_d{=}0.5$, $w_{\text{KL}}{=}1.0$
-(KL free-bits floor $\beta_{\text{KL}}{=}0.5$).
-$\mathcal{L}_{\text{recon}}$ combines MSE for physics and BCE for contacts;
-$\mathcal{L}_{\text{rew}}$ is squared reward error on raw (unscaled) rewards;
-$\mathcal{L}_{\text{done}}$ is done-flag BCE;
-$\mathcal{L}_{\text{KL}} = \text{KL}(q_\theta \| p_\theta)$
-is the posterior--prior KL divergence. All heads are trained on posterior states, so the reward head learns to read the reward of a transition after the posterior has seen the resulting observation.
+The decoder has a shared MLP backbone feeding physics (MSE), contact (BCE) and done (BCE) heads, $\hat{\bm{o}}_t = g_\theta(\bm{s}_t)$, and a separate 3-layer reward MLP $\hat{r}_t = \rho_\theta(\bm{s}_t)$ that reads $[\bm{h};\bm{z}]$ directly. The model is trained on a weighted sum of reconstruction, reward, done and KL losses (Appendix~\ref{sec:app-model}). All heads are trained on posterior states, so the reward head learns to read the reward of a transition after the posterior has seen the resulting observation.
 
 \subsection{MPC via Cross-Entropy Method (CEM)}
 \label{sec:cem}
@@ -135,15 +113,13 @@ with $\gamma{=}0.97$, $w_{\hat r}{=}0.2$ and $w_{\text{done}}{=}2.5$, where $\ha
 \subsection{Actor-Critic Policy via Latent Imagination}
 \label{sec:ac}
 
-Following Dreamer~\cite{hafner2020dreamer}, we train an actor--critic policy (A2C) entirely within the latent imagination of the world model. The actor and critic are compact 3-layer MLPs (hidden dimension of 256) that read the latent state $[\bm{h};\bm{z}]$; the actor outputs a categorical distribution over the 4 actions, the critic predicts scalar value estimates. Each training step samples a real observation--action sequence from the replay dataset, warms the RSSM posterior up for 5 steps on the real data, then imagines 15 further steps by rolling out the prior with actions sampled from the actor (no observation correction). Value targets are $\lambda$-returns~\cite{schulman2015gae} ($\gamma{=}0.99$, $\lambda{=}0.95$) computed from the world model's reward head; the actor is updated by REINFORCE with advantage clipping, the critic by MSE, and entropy is decayed from $0.5$ to $0.15$ over training. We train for $1000$ epochs at learning rate $3{\times}10^{-5}$ and batch size $256$. This stage uses \emph{zero additional real-environment interactions}: all learning happens in the learned world model on the same offline dataset used to train it.
+Following Dreamer~\cite{hafner2020dreamer}, we also train an actor--critic policy (A2C) entirely in the world model's latent imagination: five posterior warm-up steps on logged data, then $15$ imagined prior steps under the actor, with $\lambda$-return targets from the reward head. It uses no real-environment interaction beyond the offline dataset (details in Appendix~\ref{sec:app-model}).
 
 \subsection{Baselines}
 \label{sec:mfac-method}
 \label{sec:bc-method}
 
-\paragraph{Model-free A2C (MF-AC).} Actor and critic are 3-layer MLPs of width $256$ over the raw observation, trained in the real environment for $1000$ epochs at $50$ episodes per epoch ($\approx{18.4\text{M}}$ transitions), with learning rate $3{\times}10^{-4}$, $\gamma{=}0.99$, $\lambda{=}0.95$, and entropy decayed from $0.2$ to $0.01$.
-
-\paragraph{Behaviour cloning (BC).} A policy with the same architecture as the MF-AC actor is trained by cross-entropy on the human action, using only the $285$ good training episodes with return at least $+200$ (about $86$k transitions, part held out for early stopping). The checkpoint is chosen by validation cross-entropy, with no environment interaction, and training takes under a minute. At test time we evaluate both the argmax (deterministic) action and an action sampled from the predicted distribution (stochastic). BC does not use the world model.
+Model-free A2C (MF-AC) uses actor and critic networks of the same width on the raw observation and is trained in the real environment (about $18.4$M transitions). Behaviour cloning (BC) trains the same actor architecture by cross-entropy on the human actions of the $285$ training episodes with return at least $+200$, and is evaluated with both argmax and sampled actions. BC does not use the world model. Details are in Appendix~\ref{sec:app-model}.
 
 %==========================================================================
 \section{The Reward Observability Fraction}
@@ -191,7 +167,7 @@ where $P_{\mathcal{C}}$ projects onto $\mathrm{range}(\mathcal{C}_H)$. ROF (Rewa
 
 \subsection{What ROF measures, intuitively}
 
-Row block $k$ of $\mathcal{O}_H$ answers the question: if the belief were wrong along direction $\bm{x}$, how would the observation $k$ steps later change? A direction that changes \emph{some} observation within the horizon is one that sensing can, in principle, detect and correct; a direction that changes none of them is invisible to the next $H$ observations. $\Obs_H$ is the set of detectable directions. The reward gradient $\bm{r}$ is the direction in latent space that the reward head is most sensitive to.
+Row block $k$ of $\mathcal{O}_H$ answers the question: if the belief were wrong along direction $\bm{x}$, how would the observation $k$ steps later change? A direction that changes \emph{some} observation within the horizon is one that sensing can, in principle, detect; a direction that changes none of them is invisible to the next $H$ observations. $\Obs_H$ is the set of detectable directions. The reward gradient $\bm{r}$ is the direction in latent space that the reward head is most sensitive to.
 
 ROF therefore asks how much of what the reward head reads is made of things the observations reveal. Because it is a ratio of Euclidean lengths, the answer depends on how the latent axes are scaled: stretching one coordinate can move ROF without changing what the model computes. We read it as a property of the trained coordinates, not of the task. The theorem below makes ``reveal'' precise.
 
@@ -227,6 +203,8 @@ For the model~\eqref{eq:lgss} with $\Sigma_v \succ 0$:
 (b) By~\eqref{eq:bundle} the conditional law of the bundle given $\bm{s}_0$ is Gaussian with mean $\mathcal{O}_H \bm{s}_0 + \bm{\mu}$ and covariance $\Sigma_o$, which is free of $\bm{s}_0$. Because $\mathcal{O}_H (I - P_\Obs) = 0$, the mean, and hence the whole conditional law, depends on $\bm{s}_0$ only through $P_\Obs \bm{s}_0$. The Markov chain $\bm{s}_0 \to P_\Obs \bm{s}_0 \to \bm{o}_{0:H-1}$ then gives $I(\bm{s}_0; \bm{o}) \le I(P_\Obs \bm{s}_0; \bm{o})$ by data processing, and the reverse inequality holds because $P_\Obs \bm{s}_0$ is a function of $\bm{s}_0$.
 \end{proof}
 
+The argument is elementary. Its use here is to fix what the observable subspace means for a trained model, and so what ROF can and cannot claim.
+
 \begin{remark}[What the theorem does not say]
 Part (b) is deliberately prior-free. It does \emph{not} say that the posterior variance of $R\bm{s}$ cannot shrink when $\bm{r} \in \Obs_H^\perp$: a correlated prior lets observable coordinates inform unobservable ones. What holds without qualification is that the likelihood itself is silent about $\Obs_H^\perp$; any learning there is inherited from prior correlation.
 \end{remark}
@@ -255,36 +233,15 @@ Single-checkpoint estimates are noisy (Appendix~\ref{sec:app-repro}), so we repo
 \subsection{Environment and Data}
 \label{sec:data}
 
-We use Gymnasium's LunarLander-v3 (Section~\ref{sec:architecture}). The reward decomposes into per-step shaping plus terminal events; we give the explicit formula and analyze its observability in Section~\ref{sec:reward-predictability}.
+We use Gymnasium's LunarLander-v3 (Section~\ref{sec:architecture}). The reward decomposes into per-step shaping plus terminal events; we give the explicit formula and analyse its observability in Section~\ref{sec:reward-predictability}.
 
-We collected $872$ human-piloted episodes ($180{,}916$ environment steps; $158{,}685$ train + $22{,}231$ validation), split $750/122$ train/val ($32{,}038$/$4{,}500$ valid sequence positions at length $30$, stride $5$). Two pilots took turns to introduce stylistic diversity, and the mix deliberately covers clean landings, near-misses, and crashes so the world model sees both reward-positive and reward-negative regimes; the mean return of the training episodes is $-38.2$. The dataset is collected once and reused for all model-based training and evaluation. For ROF we further split the validation episodes into a \emph{good-pool} (return $\ge +100$; $2{,}713$ sequences) and a \emph{bad-pool} (return $\le -100$; $1{,}027$ sequences), and estimate each quantity on $N_J{=}128$ latent states warmed up on that pool (Section~\ref{sec:estimation}).
+We collected $872$ human-piloted episodes ($180{,}916$ environment steps; $158{,}685$ train + $22{,}231$ validation), split $750/122$ train/val ($32{,}038$/$4{,}500$ valid sequence positions at length $30$, stride $5$). Two pilots took turns to introduce stylistic diversity, and the mix deliberately covers clean landings, near-misses, and crashes so the world model sees both reward-positive and reward-negative regimes; the mean return of the training episodes is $-38.2$. The dataset is collected once and reused for all model-based training and evaluation.
 
 \subsection{World Model Training}
 
 The RSSM world model (WM) is trained for $500$ epochs with learning rate $10^{-4}$ (AdamW), batch size $64$, sequence length $30$ at stride $5$, KL free-bits floor $\beta_{\text{KL}}{=}0.5$, and loss weights as in~\eqref{eq:loss}. Checkpoints are saved every $5$ epochs, yielding $100$ for evaluation. Seeds (dataloader shuffling, model initialization, evaluation episodes) are fixed to $12345$ unless stated otherwise.
 
-\paragraph{Runs.} We refer to training runs by tags of the form \emph{seed}-\emph{GPU}-\emph{protocol} (Table~\ref{tab:runs}). All downstream experiments in this section use a single run, \texttt{12345-3080-R}, the run analyzed in the first version; repeating the A2C and behaviour-cloning comparisons on every run would have been prohibitive. It is not the strongest run: it collapses late in training, and runs with seed $777$ reach higher MPC returns (Figure~\ref{fig:all-runs}).
-
-\begin{table}[htbp]
-\centering
-\small
-\begin{tabular}{@{}l l l@{}}
-\toprule
-\textbf{Tag} & \textbf{Training} & \textbf{Hardware} \\
-\midrule
-\texttt{12345-3080-R} & trained to epoch $300$, then resumed to $500$ in a new process$^{\ast}$ & RTX 3080 \\
-\texttt{12345-3080-C} & one continuous process & RTX 3080 \\
-\texttt{12345-5090-C} & one continuous process & RTX 5090 \\
-\texttt{12345-5090-A} & as \texttt{12345-5090-C} to epoch $300$, then AdamW moments reset & RTX 5090 \\
-\texttt{777-3080-C}   & one continuous process & RTX 3080 \\
-\texttt{777-5090-A}   & as \texttt{777-3080-C} to epoch $300$, then AdamW moments reset & RTX 5090 after epoch $300$ \\
-\texttt{777-L40S-C}   & one continuous process & L40S \\
-\texttt{12345-3080-Z}, \texttt{12345-5090-Z} & one continuous process, reward head reads $\bm{z}$ only (Section~\ref{sec:zonly}) & RTX 3080 / 5090 \\
-\bottomrule
-\end{tabular}
-\caption{Training runs referred to by tag. All use the human dataset and the configuration of this section; the first number is the training seed. $^{\ast}$The resume restarted the AdamW moments and re-seeded the random stream. Other seed panels (Sections~\ref{sec:domain} and~\ref{sec:heterogeneity}) are referred to by seed.}
-\label{tab:runs}
-\end{table}
+\paragraph{Runs.} We refer to training runs by tags of the form \emph{seed}-\emph{GPU}-\emph{protocol} (Table~\ref{tab:runs} in Appendix~\ref{sec:app-model}). All downstream experiments in this section use a single run, \texttt{12345-3080-R}, the run analysed in the first version; repeating the A2C and behaviour-cloning comparisons on every run would have been prohibitive. It is not the strongest run: it collapses late in training, and runs with seed $777$ reach higher MPC returns (Figure~\ref{fig:all-runs}).
 
 \subsection{MPC Evaluation}
 \label{sec:mpc-perf}
@@ -302,7 +259,7 @@ Each of the $100$ checkpoints is evaluated with CEM-MPC (Section~\ref{sec:cem}) 
 \label{sec:ac-setup}
 \label{sec:data-efficiency}
 
-We train A2C in imagination (Section~\ref{sec:ac}) on nine checkpoints of \texttt{12345-3080-R}, spanning early training to the MPC plateau, and evaluate every saved actor on $100$ deterministic episodes (seeds $12345{+}k$, $600$-step cap). A2C quality follows the world model's MPC quality: the plateau checkpoints give the best policies, and early checkpoints can reach a high best-case mean but not a safe checkpoint (Appendix~\ref{sec:app-ac}, Table~\ref{tab:ac-summary}). Identifying the plateau required the closed-loop MPC sweep. MF-AC is evaluated with the same $100$-episode protocol but LunarLander's standard $1000$-step horizon; it peaks at epoch~$760$ with mean $+193.04$ ($54/100$ perfect, $0/100$ catastrophic).
+We train A2C in imagination (Section~\ref{sec:ac}) on nine checkpoints of \texttt{12345-3080-R}, spanning early training to the MPC plateau, and evaluate every saved actor on $100$ deterministic episodes (seeds $12345{+}k$, $600$-step cap). The plateau checkpoints give the most consistently safe A2C policies; early checkpoints can reach a high best-case mean (world model $100$ has the highest) but their safest policies score much lower (Appendix~\ref{sec:app-ac}, Table~\ref{tab:ac-summary}). Identifying the plateau required the closed-loop MPC sweep. MF-AC is evaluated with the same $100$-episode protocol but LunarLander's standard $1000$-step horizon; it peaks at epoch~$760$ with mean $+193.04$ ($54/100$ perfect, $0/100$ catastrophic).
 
 We measure data cost in real environment steps. All model-based methods share the same offline dataset ($180{,}916$ steps); MF-AC's cost is the cumulative transition count up to its best epoch and needs $65.3\times$ more data than world-model based methods. Table~\ref{tab:data-efficiency} reports the results.
 
@@ -321,12 +278,12 @@ MF-AC (peak @ ep~$760$)                  & $11{,}820{,}726$ & $+193.04$         
 \bottomrule
 \end{tabular}%
 }
-\caption{MPC vs world-model-based AC policy vs model-free AC policy training complexity and closed-loop returns in real environment. Model-free AC policy (MF-AC) is the most expensive to train data-wise (needs $65.3\times$ more data provided as sim interactions). World model based methods achieve higher or similar returns to MF-AC despite requiring much less training data (only offline dataset). Checkpoint evaluation of the A2C policies themselves is excluded on both sides. MPC and WM-AC use a $600$-step cap; MF-AC uses the standard $1000$-step horizon. \textbf{Perfect} $=$ return ${\geq}{+}200$; \textbf{Catast.}\ $=$ return ${<}{-}100$.}
+\caption{MPC vs world-model-based AC policy vs model-free AC policy training complexity and closed-loop returns in real environment. Model-free AC policy (MF-AC) is the most expensive to train data-wise (needs $65.3\times$ more data provided as sim interactions). World model based methods achieve higher or similar returns to MF-AC despite requiring much less training data (only offline dataset). Checkpoint evaluation of the A2C policies themselves is excluded on both sides. MPC and WM-AC use a $600$-step cap; MF-AC uses the standard $1000$-step horizon. \textbf{Perfect} $=$ return $>+200$ (as in the evaluation code); \textbf{Catast.}\ $=$ return $<-100$.}
 \label{tab:data-efficiency}
 \end{table}
 
 \paragraph{Analysis.}
-The best model-based A2C (WM~$280$) reaches mean $\mathbf{+217.48}$, ${\sim}24.5$ points above MF-AC's peak, with ${\sim}65\times$ fewer training transitions. CEM-MPC on the same world-model family reaches $+166.6$ with no policy training. MF-AC keeps the tightest worst case ($0/100$ catastrophic). At inference time, the A2C policy runs in real-time and CEM-MPC runs at $10$Hz on 5090 GPU.
+The selected model-based A2C policy (WM~$280$) reaches mean $\mathbf{+217.48}$, ${\sim}24.5$ points above MF-AC's peak, with ${\sim}65\times$ fewer training transitions. Both figures are the best of their checkpoints scored on the same $100$ episodes used to choose them (the best of $20$ A2C checkpoints for WM~$280$; MF-AC's peak is chosen the same way), so both are biased upward and the margin should be read with that in mind. CEM-MPC on the same world-model family reaches $+166.6$ with no policy training. MF-AC keeps the tightest worst case ($0/100$ catastrophic). At inference time, the A2C policy runs in real-time and CEM-MPC runs at $10$Hz on 5090 GPU.
 
 \subsection{Behaviour Cloning vs.\ World Model with MPC}
 \label{sec:bc}
@@ -351,14 +308,14 @@ MPC, best checkpoint of all runs$^\dagger$ & $+216.6$ & $+12.7$ & $18/20$ & $0$ 
 \label{tab:bc}
 \end{table}
 
-Three observations. First, \textbf{action selection decides whether BC works at all}: the same weights score $+185.6$ when sampling and $-190.2$ under argmax. The human pilots control the main engine by duty cycle, firing it on $42.3\%$ of steps in the successful demonstrations; the policy learns that firing \emph{rate} as a probability, and argmax turns a probability such as $0.55$ into firing on every step, a different controller that over-thrusts and drifts off the demonstrated state distribution. Second, \textbf{stochastic BC matches MPC on the mean but not on the tail}: every MPC row has zero catastrophic episodes and a worst case of $-70.9$ or better, while BC has one catastrophic episode and a worst case of $-190.8$. BC also descends visibly faster and more roughly ($285$ steps per episode against $380$--$383$ for MPC on \texttt{12345-3080-R}). Third, BC is only trained on good successful landing episodes and therefore its training data is harder to obtain compared to world-model based methods.
+Three observations. First, \textbf{action selection decides whether BC works at all}: the same weights score $+185.6$ when sampling and $-190.2$ under argmax. The human pilots control the main engine by duty cycle, firing it on $42.3\%$ of steps in the successful demonstrations; the policy learns that firing \emph{rate} as a probability, and argmax turns a probability such as $0.55$ into firing on every step, a different controller that over-thrusts and drifts off the demonstrated state distribution. Second, \textbf{stochastic BC matches MPC on the mean, and on these $20$ episodes its tail is worse}: every MPC row has zero catastrophic episodes and a worst case of $-70.9$ or better, while BC has one catastrophic episode and a worst case of $-190.8$. BC also descends visibly faster and more roughly ($285$ steps per episode against $380$--$383$ for MPC on \texttt{12345-3080-R}). Third, BC is only trained on good successful landing episodes and therefore its training data is harder to obtain compared to world-model based methods.
 
 %==========================================================================
 \section{What Moves ROF}
 \label{sec:validity}
 %==========================================================================
 
-The theorem names a subspace. ROF is a Euclidean split of the reward gradient onto that subspace, so it depends on how the latent is scaled. Capacity offsets and the raw Reacher--LunarLander correlation with MPC return do not survive whitening the state by its validation covariance; we do not use them as evidence. The test that remains is a hard restriction of the reward head.
+The theorem names a subspace. ROF is a Euclidean split of the reward gradient onto that subspace, so it depends on how the latent is scaled. To separate geometry from scaling we recompute ROF after whitening the latent by its covariance over validation states, which makes the fraction invariant to any invertible linear change of latent coordinates (Appendix~\ref{sec:app-coords}). Three comparisons drawn from raw ROF do not survive this. Across twelve runs (four training-data mixtures and two capacity variants, two seeds each), the rank correlation between raw and whitened bad-pool levels is $-0.09$. Halving the recurrent state shifts the raw level by $+0.098$ but the whitened level by only $+0.007$. The within-run correlation between ROF and MPC return, positive in all eight Reacher runs and of mixed sign on LunarLander in raw coordinates, changes under whitening to negative in all eight Reacher runs and positive in all eight LunarLander runs. We therefore do not use capacity or domain comparisons of ROF as evidence. The test that remains is a hard restriction of the reward head.
 
 \subsection{Restricting the reward head to the stochastic latent}
 \label{sec:zonly}
@@ -393,7 +350,7 @@ The posterior corrects only $\bm{z}$ (Section~\ref{sec:architecture}). We retrai
 \label{fig:zonly-rof}
 \end{figure}
 
-Table~\ref{tab:zonly} and Figure~\ref{fig:zonly-rof} show the same move on both GPUs: the head is forced onto $\bm{z}$, and more of the reward gradient sits in the observable subspace (and less in the controllable one). Whitening the latent by its validation covariance keeps the sign of that gap and reduces its size. The ablation also costs return: \texttt{12345-5090-Z} is slow to take off and never reaches the ceiling of its $[\bm{h},\bm{z}]$ control, which is what one would expect if part of LunarLander's reward must be read from history in $\bm{h}$.
+Table~\ref{tab:zonly} and Figure~\ref{fig:zonly-rof} show the same move on both GPUs: the head is forced onto $\bm{z}$, and more of the reward gradient sits in the observable subspace (and less in the controllable one). On the 3080 GPU pair, whitening the latent (Appendix~\ref{sec:app-coords}) keeps the sign of that gap and roughly halves it. The ablation also costs return: \texttt{12345-5090-Z} is slow to take off and never reaches the ceiling of its $[\bm{h},\bm{z}]$ control, which is consistent with part of LunarLander's reward being read from history in $\bm{h}$, though the ablation does not show what the head reads there.
 
 The 3080 pair was a mechanism test for collapse; it came back negative (Section~\ref{sec:negative}).
 
@@ -401,19 +358,19 @@ The 3080 pair was a mechanism test for collapse; it came back negative (Section~
 \label{sec:reward-predictability}
 \label{sec:domain}
 
-LunarLander's per-step reward, taken from the Gymnasium reference implementation,\footnote{\url{https://github.com/Farama-Foundation/Gymnasium/blob/main/gymnasium/envs/box2d/lunar_lander.py}} has the form
+LunarLander's per-step reward, taken from the Gymnasium reference implementation,\footnote{\url{https://github.com/Farama-Foundation/Gymnasium/blob/main/gymnasium/envs/box2d/lunar_lander.py}} is, on non-terminal steps,
 \begin{equation}
-r_t \;=\; \underbrace{\phi(o_{t+1}) - \phi(o_t)}_{\text{PBRS shaping}} \;-\; c_{\text{main}}\, \mathbb{1}[a_t{=}\text{main}] \;-\; c_{\text{side}}\, \mathbb{1}[a_t{\in}\{\text{L,R}\}] \;+\; r^{\text{term}}_t,
+r_t \;=\; \underbrace{\phi(o_{t+1}) - \phi(o_t)}_{\text{PBRS shaping}} \;-\; c_{\text{main}}\, \mathbb{1}[a_t{=}\text{main}] \;-\; c_{\text{side}}\, \mathbb{1}[a_t{\in}\{\text{L,R}\}],
 \label{eq:lander-reward}
 \end{equation}
-with shaping potential $\phi(o) = -100(\|p\|+\|v\|) - 100|\theta| + 10(\text{leg}_1+\text{leg}_2)$ defined on the visible state, $(c_{\text{main}}, c_{\text{side}}) = (0.30, 0.03)$, and $r^{\text{term}}_t \in \{-100, +100, 0\}$ awarded only at episode end and gated by Box2D-internal flags (\texttt{game\_over}, \texttt{lander.awake}) absent from $o_t$. MLP regressors trained on our dataset explain only $R^2{=}0.29$ of the per-step reward from $(o_t, a_t)$, but $0.97$ once $o_{t+1}$ is added and terminal steps are removed. On Reacher with the same RSSM, $(o_t, a_t)$ alone gives $R^2{=}0.9998$.
+with shaping potential $\phi(o) = -100(\|p\|+\|v\|) - 100|\theta| + 10(\text{leg}_1+\text{leg}_2)$ defined on the visible state and $(c_{\text{main}}, c_{\text{side}}) = (0.30, 0.03)$. On the terminal step this reward is replaced, not supplemented: by $-100$ after a crash or when the lander leaves the screen ($|x| \ge 1$), and by $+100$ when it comes to rest. Leaving the screen is visible in $o_t$; the crash and rest conditions are Box2D-internal flags (\texttt{game\_over}, \texttt{lander.awake}) that are not. MLP regressors trained on our dataset explain only $R^2{=}0.29$ of the per-step reward from $(o_t, a_t)$, but $0.97$ once $o_{t+1}$ is added and terminal steps are removed. On Reacher with the same RSSM, $(o_t, a_t)$ alone gives $R^2{=}0.9998$.
 
 What remains of the domain contrast does not use ROF. On the same eight seeds, five of eight LunarLander runs collapse and none of the Reacher runs do. LunarLander's reward is only partly in the current observation; Reacher's is almost entirely there. That is a fact about the tasks, not about a Euclidean split in latent space.
 
 \subsection{Validity at the nonlinear model}
 \label{sec:nonlinear}
 
-Theorem~\ref{thm:support} is exact only for the linearization. On five checkpoints of \texttt{12345-3080-R}, with twelve belief states each and an acceptance bound fixed before running, we perturbed belief states by $\varepsilon \in \{0.05, 0.1, 0.3\}$ along deep-kernel directions (well inside $\ker \mathcal{O}_H$) and along observable directions of matched magnitude, then rolled the model forward open-loop for $H{=}25$ steps. The median ratio of observation-space responses (kernel over observable) was $0.012$--$0.019$ at every $\varepsilon$ and every checkpoint, an order of magnitude inside the pre-set bound of $0.15$ and flat in $\varepsilon$. Likelihood silence about the kernel is therefore a property of the trained nonlinear model, not only of its linearization. Two further probes (how the amortized posterior corrects errors, and ROF on random weights) are in Appendix~\ref{sec:app-probes}.
+Theorem~\ref{thm:support} is exact only for the linearization. On five checkpoints of \texttt{12345-3080-R}, with twelve belief states each and an acceptance bound fixed before running, we perturbed belief states by $\varepsilon \in \{0.05, 0.1, 0.3\}$ along deep-kernel directions (well inside $\ker \mathcal{O}_H$) and along observable directions of matched magnitude, then rolled the model forward open-loop for $H{=}25$ steps. The median ratio of observation-space responses (kernel over observable) was $0.012$--$0.019$ at every $\varepsilon$ and every checkpoint, an order of magnitude inside the pre-set bound of $0.15$ and flat in $\varepsilon$. Within the states and perturbation sizes we tested, the trained nonlinear model is close to silent about the kernel as well, not only its linearization. A further probe, of how the amortized posterior corrects errors, is in Appendix~\ref{sec:app-probes}.
 
 %==========================================================================
 \section{Offline Prediction of Closed-Loop Collapse: A Negative Result}
@@ -422,16 +379,16 @@ Theorem~\ref{thm:support} is exact only for the linearization. On five checkpoin
 
 The first version of this paper reported that ROF, computed on a single run (\texttt{12345-3080-R}), tracked the rise--peak--collapse of MPC return ($\rho_s{=}-0.71$) and could select a good checkpoint offline. This section reports what happened when that claim was tested on more LunarLander runs: it does not hold, and neither does any alternative metric we tried.
 
-\subsection{Collapse is a property of the individual run}
+\subsection{Collapse differs between runs}
 \label{sec:heterogeneity}
 
 Three facts about collapse frame the negative result.
 
-\textbf{Collapse is common.} In an eight-seed panel trained with identical code, five of eight runs collapse; in a twelve-run panel, three of the six all-human runs do. On the same eight seeds, Reacher never collapses. Section~\ref{sec:domain} describes LunarLander rewards shaping, which may explain why world model training runs for it may collapse.
+\textbf{Collapse is common.} In an eight-seed panel trained with identical code, five of eight runs collapse; in a twelve-run panel, three of the six all-human runs do. On the same eight seeds, Reacher never collapses.
 
-\textbf{On-data metrics do not see it.} Validation loss and multi-step prediction error keep improving through collapse (Figure~\ref{fig:all-runs}, Table~\ref{tab:negative}). Among the runs of Table~\ref{tab:zonly} and \texttt{777-L40S-C}, the one with the \emph{worst} late validation loss ($35.98$, \texttt{777-L40S-C}) has by far the best return ($+189.1$ final-10), and \texttt{12345-5090-Z} has lower late validation loss than its control \texttt{12345-5090-C} ($32.75$ vs.\ $34.68$) despite its lower return.
+\textbf{On-data metrics do not see it.} Validation loss keeps improving through collapse (Figure~\ref{fig:all-runs}), and so does open-loop cumulative-reward error in $10$ of the $12$ panel runs; the two exceptions are the scripted-data runs, which were never good (Table~\ref{tab:negative}). Among the runs of Table~\ref{tab:zonly} and \texttt{777-L40S-C}, the one with the \emph{worst} late validation loss ($35.98$, \texttt{777-L40S-C}) has by far the best return ($+189.1$ final-10), and \texttt{12345-5090-Z} has lower late validation loss than its control \texttt{12345-5090-C} ($32.75$ vs.\ $34.68$) despite its lower return.
 
-\textbf{Collapse is decided per run.} The seed-$777$ runs rise monotonically on the same data and configuration as \texttt{12345-3080-R} (Figure~\ref{fig:all-runs}). Seed $12345$ trained as one continuous process collapses on an RTX 3080 (\texttt{12345-3080-C}: MA-7 peak $+99.0$, final-10 $-31.9$) but not on an RTX 5090 (\texttt{12345-5090-C}: peak $+168.0$, final-10 $+157.6$). Resetting the AdamW moments at epoch $300$ on a healthy path degrades seed $12345$ only moderately (\texttt{12345-5090-A}) and leaves seed $777$ healthy (\texttt{777-5090-A}), so the restart of \texttt{12345-3080-R} was not the cause. Whether a run collapses is therefore decided by accumulated numerical differences in its training path, which is why the first version's correlation, measured on one run, did not generalize.
+\textbf{Collapse differs between runs with the same configuration.} The seed-$777$ runs rise monotonically on the same data and configuration as \texttt{12345-3080-R} (Figure~\ref{fig:all-runs}). Seed $12345$ trained as one continuous process collapses on an RTX 3080 (\texttt{12345-3080-C}: MA-7 peak $+99.0$, final-10 $-31.9$) but not on an RTX 5090 (\texttt{12345-5090-C}: peak $+168.0$, final-10 $+157.6$). Resetting the AdamW moments at epoch $300$ on a healthy path degrades seed $12345$ only moderately (\texttt{12345-5090-A}) and leaves seed $777$ healthy (\texttt{777-5090-A}), so the restart of \texttt{12345-3080-R} was not the cause. Collapse therefore differs between runs with the same data and nominal configuration, and these comparisons do not identify which difference in the training path causes it. That is why the first version's correlation, measured on one run, did not generalize.
 
 \subsection{ROF does not predict collapse}
 \label{sec:rof-negative}
@@ -455,26 +412,26 @@ Three facts about collapse frame the negative result.
 Eight-seed CPU panel & 5 of 8 collapse & $-0.55$ to $+0.32$ \\
 \bottomrule
 \end{tabular}
-\caption{Within-run Spearman correlation between pool-averaged ROF in the trained coordinates and MA-7 MPC return. Jacobian-state count and metric seeds differ between runs, so the values are indicative; the spread of signs is not.}
+\caption{Within-run Spearman correlation between pool-averaged ROF in the trained coordinates and MA-7 MPC return. Table~\ref{tab:zonly} uses good-pool ROF for its four runs, so its values differ. Jacobian-state count and metric seeds differ between runs, so the values are indicative; the spread of signs is not.}
 \label{tab:sign}
 \end{table}
 
-\paragraph{No stable sign.} Table~\ref{tab:sign} shows that the within-run correlation between ROF and closed-loop return ranges from $-0.71$ to $+0.79$ and crosses zero among both collapsing and healthy runs. The first version's $-0.71$ is one draw from this distribution, and no fixed signed threshold can mean the same thing on two runs.
+\paragraph{No stable sign.} Table~\ref{tab:sign} shows that the within-run correlation between ROF and closed-loop return ranges from $-0.71$ to $+0.79$ and crosses zero among both collapsing and healthy runs. The first version's $-0.71$ is one draw from this distribution, and no fixed signed threshold can mean the same thing on two runs. This instability belongs to raw ROF. After whitening (Appendix~\ref{sec:app-coords}), the within-run correlation is positive in $20$ of the $22$ LunarLander runs we recomputed, the other two at $-0.06$. That observation was made after the fact, and we have not tested whitened ROF as a predictor of collapse.
 
-\paragraph{No early warning.} Where ROF has an interior turning point it follows the MPC turn rather than leading it (by $90$--$155$ epochs on the runs where we can check); the lead of ${\sim}60$ epochs on \texttt{12345-3080-R} is the only case in which ROF turned first.
+\paragraph{No early warning.} Where ROF has an interior turning point it follows the MPC turn rather than leading it (by $90$--$155$ epochs on the runs where we can check); the lead of ${\sim}60$ epochs on \texttt{12345-3080-R} is the only case in which ROF turned first. In three of the five collapsing runs of the eight-seed panel, ROF's minimum falls at the start of training (epochs $5$ to $30$), so there is no interior turn to give warning at all.
 
-\paragraph{A pre-registered detector failed out of sample.} Before the later runs existed, we fixed a detector from the $19$ runs then available: flag a run if the maximum drawdown of its smoothed good-pool ROF from its trailing maximum exceeds $0.05$ (\texttt{12345-3080-R} and \texttt{12345-3080-C} scored $0.061$ and $0.064$, healthy runs at most $0.044$). On a later twelve-run panel it produced two true positives, one false alarm on a never-good run, and six misses, including a run that fell from $+151.8$ to $+8.8$ at a drawdown of only $0.035$. On \texttt{12345-3080-Z}, which fell from $+107.7$ to a final-10 of $+15.1$, it stayed quiet at $0.007$.
+\paragraph{A pre-registered detector failed out of sample.} Before the later runs existed, we fixed a detector from the $19$ runs then available: flag a run if the maximum drawdown of its smoothed good-pool ROF from its trailing maximum exceeds $0.05$ (\texttt{12345-3080-R} and \texttt{12345-3080-C} scored $0.061$ and $0.064$, healthy runs at most $0.044$). On a later twelve-run panel it produced two true positives, one false alarm on a never-good run, and six misses, including a run whose MA-7 return fell from $+151.8$ to a final-10 of $+8.8$ at a drawdown of only $0.035$. On \texttt{12345-3080-Z}, which fell from $+107.7$ to a final-10 of $+15.1$, it stayed quiet at $0.007$.
 
-\paragraph{The clearest dissociation.} \texttt{12345-3080-Z} asks whether collapse is caused by reward information sitting in $\bm{h}$. Removing $\bm{h}$ from the reward head does not stop it. The late slope matches the control (Table~\ref{tab:zonly}); the peak is later, the decay is the same (Figure~\ref{fig:zonly-mpc}). ROF rises through the collapse (Figure~\ref{fig:zonly-rof}).
+\paragraph{The clearest dissociation.} \texttt{12345-3080-Z} asks whether collapse is caused by reward information sitting in $\bm{h}$. Removing $\bm{h}$ from the reward head does not stop it. Its late trend (the Spearman correlation of MA-7 return with epoch) matches the control's (Table~\ref{tab:zonly}); the peak is later, the decay is the same (Figure~\ref{fig:zonly-mpc}). Raw ROF rises through the collapse (Figure~\ref{fig:zonly-rof}), but whitened ROF stays flat, so that half of the dissociation holds only in the trained coordinates.
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.78\textwidth]{figures/zonly3080_mpc.png}
-\caption{MA-7 CEM-MPC return for the reward-head ablation. \texttt{12345-3080-Z} collapses with the same late slope as its $[\bm{h},\bm{z}]$ control \texttt{12345-3080-C}, while its ROF rises (Figure~\ref{fig:zonly-rof}).}
+\caption{MA-7 CEM-MPC return for the reward-head ablation. \texttt{12345-3080-Z} collapses with the same late slope as its $[\bm{h},\bm{z}]$ control \texttt{12345-3080-C}, while its raw ROF rises (Figure~\ref{fig:zonly-rof}).}
 \label{fig:zonly-mpc}
 \end{figure}
 
-\subsection{No other offline statistic predicted it either}
+\subsection{None of the other offline statistics we tested predicted it}
 \label{sec:negative-tests}
 
 Table~\ref{tab:negative} summarizes every test. Tests marked as pre-registered had their predictions written down before any number was computed.
@@ -492,8 +449,8 @@ ROF drawdown detector (pre-reg.) & Max drawdown of smoothed good-pool ROF $> 0.0
 Offline metric screen & 27 offline metrics (Appendix~\ref{sec:app-metrics}) $\times$ 4 summaries (mean, final, drawdown, trend) $=108$ candidates, against MPC drawdown and final-10 & 17 (11 human-data) & $0$ of $108$ beat a permutation null on the maximum $|\rho_s|$ (thresholds $0.755$--$0.882$); best candidate \texttt{ol\_cumrew\_err.trend}, $|\rho_s|{=}0.82$ \\
 Held-out test of best candidate (pre-reg.) & Trend of open-loop cumulative-reward error & 12 new & $\rho_s{=}-0.17$ and $-0.09$; the error \emph{improves} through collapse in 10 of 12 runs \\
 Reward-head mechanism & Remove $\bm{h}$ from the reward head on a collapsing substrate & 2 & Late trend $-0.87$ vs.\ $-0.88$; collapse not prevented \\
-Planner leaves the data support (pre-reg.) & From $59$ pre-contact validation states, CEM plan rolled out in imagination and in the real environment; distance of imagined states from training data & 9 & Support distance flat in every run ($|\Delta| \le 0.015$ on $0.37$); optimism rises in 2 of 3 matched pairs; no within-run tracking \\
-Planner advantage & Predicted return of the CEM plan minus predicted return of the logged human actions, same states & 9 & $56$--$68$ in every run, early and late, healthy or collapsing \\
+Planner leaves the data support (pre-reg.) & From $59$ pre-contact validation states, CEM plan rolled out in imagination and in the real environment; standardized distance of imagined observations from training observations & 9 & Support distance flat in every run ($|\Delta| \le 0.015$ on $0.37$); optimism rises in 2 of 3 matched pairs; no within-run tracking \\
+Planner advantage & Predicted return of the CEM plan minus predicted return of the logged human actions, same states & 9 & $59$--$64$ in every run (means over epochs $100$--$200$ and $400$--$500$; single checkpoints $56$--$68$), healthy or collapsing \\
 Closed-loop belief (pre-reg.) & Instrumented MPC episodes: planner's predicted vs.\ realised return and belief error, flight vs.\ near-ground & 9 & Near-ground belief error rises in every run, healthy ones included; 0 of 3 matched pairs show more optimism in the collapsing arm \\
 Terminal-reward fidelity & Imagined reward and termination at logged crashes and landings, $1$--$25$ steps ahead & 8 & Crash anticipated at $-7$ to $-10$ (true $-100$) in every run; no change tracks MPC drawdown ($|\rho_s| \le 0.38$) \\
 \bottomrule
@@ -502,39 +459,97 @@ Terminal-reward fidelity & Imagined reward and termination at logged crashes and
 \label{tab:negative}
 \end{table*}
 
-Two points deserve emphasis. First, the metrics that evaluate the model on the data distribution improve through collapse: the open-loop cumulative-reward error keeps falling while planning with the same model fails. Second, the probes that look at the planner --- where its plans go, how optimistic it is, what it believes near the ground --- do not separate healthy from collapsing runs either. 
+Two points deserve emphasis. First, the metrics that evaluate the model on the data distribution improve through collapse: the open-loop cumulative-reward error keeps falling while planning with the same model fails. Second, the probes that look at the planner (where its plans go, how optimistic it is, what it believes near the ground) do not separate healthy from collapsing runs either, with two limits: the support probe starts before leg contact and cannot see the landing, and the closed-loop probe uses ten episodes per checkpoint, which leaves wide scatter. 
 
 %==========================================================================
 \section{Discussion and Limitations}
 \label{sec:discussion}
 %==========================================================================
 
-\paragraph{Why offline metrics may be structurally blind here.} Every offline statistic we computed evaluates the model on states drawn from the logged data, or from short rollouts started at them. Collapse, by contrast, is a property of hundreds of closed-loop steps under the planner's own actions, and on this task it appears to be decided by small differences in the training path that leave on-data prediction quality intact or even improving. A metric that is a function of the model and the validation data alone can only predict it if those differences leave a trace on the data distribution, and in our runs we found none. What makes a model good for planning also depends on where the task's return is concentrated. Here it is concentrated in rare terminal events that imagination barely reproduces: the reward head predicts about $-80$ at a logged crash when the posterior sees the crash, but only $-7$ to $-10$ when imagining it $25$ steps ahead, in every run, so CEM steers on the dense shaping reward, which favours the slow, straight descents we observe. Only the most severe collapse (\texttt{12345-3080-C}) showed a closed-loop signature, a planner whose predicted near-ground return doubled while its realised return fell to $-17$. Both observations argue that offline checkpoint diagnostics are unlikely to be task-agnostic, and that a small budget of closed-loop evaluation, as in~\cite{yang2026boms}, is the practical answer.
+\paragraph{Why offline metrics may be structurally blind here.} Every offline statistic we computed evaluates the model on states drawn from the logged data, or from short rollouts started at them. Collapse, by contrast, is a property of hundreds of closed-loop steps under the planner's own actions, and on this task it varies with differences in the training path that leave on-data prediction quality intact or even improving. A metric that is a function of the model and the validation data alone can only predict it if those differences leave a trace on the data distribution, and in our runs we found none. What makes a model good for planning also depends on where the task's return is concentrated. Here it is concentrated in rare terminal events that imagination barely reproduces: the reward head predicts about $-80$ at a logged crash when the posterior sees the crash, but only $-7$ to $-10$ when imagining it $25$ steps ahead, in every run, so CEM steers on the dense shaping reward, which favours the slow, straight descents we observe. Only the most severe collapse (\texttt{12345-3080-C}) showed a closed-loop signature, a planner whose predicted near-ground return doubled while its realised return fell to $-17$. Both observations argue that offline checkpoint diagnostics are unlikely to be task-agnostic, and that a small budget of closed-loop evaluation, as in~\cite{yang2026boms}, is the practical answer.
 
-\paragraph{What ROF is for.} The theorem names the support (Theorem~\ref{thm:support}). ROF is a Euclidean fraction on that support in the trained coordinates. The $z$-only head moves it; capacity and domain comparisons of raw levels do not survive a change of coordinates, and it does not predict collapse. A natural next test is one in which observability actually binds --- pixels, occlusion, or sensor noise --- rather than LunarLander, whose observation is the full physical state. The theory also predicts filtering error along reward-relevant directions, which we have not tested.
+\paragraph{What ROF is for.} The theorem names the support (Theorem~\ref{thm:support}). ROF is a Euclidean fraction on that support in the trained coordinates. The $z$-only head moves it, and on the pair we whitened the move survives a change of coordinates; comparisons across capacity and domain do not, and it does not predict collapse. A natural next test is one in which observability actually binds (pixels, occlusion or sensor noise) rather than LunarLander, whose observation is the full physical state. A further test would measure filtering error along reward-relevant directions.
 
-\paragraph{Limitations.} All closed-loop results are on LunarLander-v3, with Reacher as a single contrasting task. The collapsing runs are few and several share seed $12345$; the offline screen has $17$ runs and the held-out test $12$. MPC returns use $20$ episodes per checkpoint, the planner probes before leg contact cannot see the landing phase, and the behaviour-cloning comparison uses $20$ episodes against MPC checkpoints chosen by closed-loop evaluation. Because the same seed and configuration can collapse on one GPU and not on another, a single training run should not be read as representative (reproducibility details in Appendix~\ref{sec:app-repro}).
+\paragraph{Limitations.} All closed-loop results are on LunarLander-v3, with Reacher as a single contrasting task. The collapsing runs are few and several share seed $12345$; the offline screen has $17$ runs and the held-out test $12$, and its $108$ candidates are four summaries of $27$ related quantities, far from independent. MPC returns use $20$ episodes per checkpoint, the planner probes before leg contact cannot see the landing phase, and the behaviour-cloning comparison uses $20$ episodes against MPC checkpoints chosen by closed-loop evaluation. Because the same seed and configuration can collapse on one GPU and not on another, a single training run should not be read as representative (reproducibility details in Appendix~\ref{sec:app-repro}).
 
 %==========================================================================
 \section{Conclusion}
 \label{sec:conclusion}
 %==========================================================================
 
-On LunarLander-v3, an RSSM world model trained on human demonstrations supports a model-based A2C policy that beats a model-free baseline with far fewer training transitions, and a zero-shot CEM planner that lands more safely than behaviour cloning on the same demonstrations. The Reward Observability Fraction is the Euclidean share of the reward readout on the Fisher support of the observations, measured in the trained coordinates. Restricting the reward head to $\bm{z}$ moves it. It does not predict when MPC will collapse, and neither did anything else we could compute from the model and the data. On this task, the planner has to be tested in closed loop.
+On LunarLander-v3, an RSSM world model trained on human demonstrations supports a model-based A2C policy whose selected checkpoint scores above the best model-free checkpoint with far fewer training transitions, and a zero-shot CEM planner that had no catastrophic episodes where behaviour cloning had one, on the same $20$ episodes. The Reward Observability Fraction is the Euclidean share of the reward readout on the Fisher support of the observations, measured in the trained coordinates. Restricting the reward head to $\bm{z}$ moves it. It does not predict when MPC will collapse, and none of the other offline summaries we tested yielded a validated predictor. On this task, the planner has to be tested in closed loop.
 
 \section*{Acknowledgments}
-We thank Larry Jackel, Urs Muller, Alexander Popov, and Alexey Kamenev for their careful reviews of the first version. Computations were performed using facilities provided by the University of Cape Town's ICTS High Performance Computing team: \url{hpc.uct.ac.za}.
-% TODO(J): confirm the exact UCT HPC acknowledgement wording.
+We thank Larry Jackel, Urs Muller, Alexander Popov, and Alexey Kamenev for their careful reviews of the first version. Computational resources were provided by the University of Cape Town's ICTS High Performance Computing facility (\url{hpc.uct.ac.za}).
 
 \bibliographystyle{plain}
 \bibliography{references}
 
 \clearpage
 \appendix
+\section{LunarLander-v3 Environment}
+\label{sec:app-env}
+
+In Gymnasium's LunarLander-v3 the agent fires one of four discrete engines (none, left, main, right) to bring a lander from a randomized initial state to a soft touchdown on the pad between the flags, observing an $8$-dimensional state (Figure~\ref{fig:lander}).
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.55\textwidth]{figures/moonlander_mpc_1.jpg}
+\caption{LunarLander-v3: four discrete actions (NOP, left/main/right thruster), $8$-D observation, soft-landing objective from a randomized initial state.}
+\label{fig:lander}
+\end{figure}
+
+\section{Model and Training Details}
+\label{sec:app-model}
+
+\paragraph{Decoder.}
+Rather than treating all 8 observation dimensions identically, the decoder uses a shared 2-layer MLP backbone (LayerNorm + SiLU, input $d_h{+}d_z{=}272$) feeding four heads: an MSE-regression \emph{physics} head ($\R^6$, continuous states), a BCE \emph{contact} head ($\R^2$ logits, sigmoid at inference), a BCE \emph{done} head ($\R^1$), and a separate 3-layer \emph{reward} MLP ($\R^{272}{\to}256{\to}256{\to}1$) that operates directly on $[\bm{h};\bm{z}]$ rather than the shared backbone, so the reward predictor develops its own representation without competing with reconstruction for backbone capacity. The observation decoder is $\hat{\bm{o}}_t = g_\theta(\bm{s}_t)$ (physics concatenated with sigmoid of contact logits); the reward predictor is $\hat{r}_t = \rho_\theta(\bm{s}_t)$.
+
+\paragraph{Training loss.} The total loss is a weighted sum:
+\begin{equation}
+  \mathcal{L} = w_r \mathcal{L}_{\text{recon}} + w_\rho \mathcal{L}_{\text{rew}}
+    + w_d \mathcal{L}_{\text{done}} + w_{\text{KL}} \, \mathcal{L}_{\text{KL}},
+  \label{eq:loss}
+\end{equation}
+with weights $w_r{=}1.0$, $w_\rho{=}1.2$, $w_d{=}0.5$, $w_{\text{KL}}{=}1.0$
+(KL free-bits floor $\beta_{\text{KL}}{=}0.5$).
+$\mathcal{L}_{\text{recon}}$ combines MSE for physics and BCE for contacts;
+$\mathcal{L}_{\text{rew}}$ is squared reward error on raw (unscaled) rewards;
+$\mathcal{L}_{\text{done}}$ is done-flag BCE;
+$\mathcal{L}_{\text{KL}} = \text{KL}(q_\theta \| p_\theta)$
+is the posterior--prior KL divergence.
+
+\paragraph{Actor-critic in imagination.} Following Dreamer~\cite{hafner2020dreamer}, we train an actor--critic policy (A2C) entirely within the latent imagination of the world model. The actor and critic are compact 3-layer MLPs (hidden dimension of 256) that read the latent state $[\bm{h};\bm{z}]$; the actor outputs a categorical distribution over the 4 actions, the critic predicts scalar value estimates. Each training step samples a real observation--action sequence from the replay dataset, warms the RSSM posterior up for 5 steps on the real data, then imagines 15 further steps by rolling out the prior with actions sampled from the actor (no observation correction). Value targets are $\lambda$-returns~\cite{schulman2015gae} ($\gamma{=}0.99$, $\lambda{=}0.95$) computed from the world model's reward head; the actor is updated by REINFORCE with advantage clipping, the critic by MSE, and entropy is decayed from $0.5$ to $0.15$ over training. We train for $1000$ epochs at learning rate $3{\times}10^{-5}$ and batch size $256$. This stage uses \emph{zero additional real-environment interactions}: all learning happens in the learned world model on the same offline dataset used to train it.
+
+\paragraph{Model-free A2C (MF-AC).} Actor and critic are 3-layer MLPs of width $256$ over the raw observation, trained in the real environment for $1000$ epochs at $50$ episodes per epoch ($\approx{18.4\text{M}}$ transitions), with learning rate $3{\times}10^{-4}$, $\gamma{=}0.99$, $\lambda{=}0.95$, and entropy decayed from $0.2$ to $0.01$.
+
+\paragraph{Behaviour cloning (BC).} A policy with the same architecture as the MF-AC actor is trained by cross-entropy on the human action, using only the $285$ good training episodes with return at least $+200$ (about $86$k transitions, part held out for early stopping). The checkpoint is chosen by validation cross-entropy, with no environment interaction, and training takes under a minute. At test time we evaluate both the argmax (deterministic) action and an action sampled from the predicted distribution (stochastic). BC does not use the world model.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{@{}l l l@{}}
+\toprule
+\textbf{Tag} & \textbf{Training} & \textbf{Hardware} \\
+\midrule
+\texttt{12345-3080-R} & trained to epoch $300$, then resumed to $500$ in a new process$^{\ast}$ & RTX 3080 \\
+\texttt{12345-3080-C} & one continuous process & RTX 3080 \\
+\texttt{12345-5090-C} & one continuous process & RTX 5090 \\
+\texttt{12345-5090-A} & as \texttt{12345-5090-C} to epoch $300$, then AdamW moments reset & RTX 5090 \\
+\texttt{777-3080-C}   & one continuous process & RTX 3080 \\
+\texttt{777-5090-A}   & as \texttt{777-3080-C} to epoch $300$, then AdamW moments reset & RTX 5090 after epoch $300$ \\
+\texttt{777-L40S-C}   & one continuous process & L40S \\
+\texttt{12345-3080-Z}, \texttt{12345-5090-Z} & one continuous process, reward head reads $\bm{z}$ only (Section~\ref{sec:zonly}) & RTX 3080 / 5090 \\
+\bottomrule
+\end{tabular}
+\caption{Training runs referred to by tag. All use the human dataset and the configuration of this section; the first number is the training seed. $^{\ast}$The resume restarted the AdamW moments and re-seeded the random stream. Other seed panels (Sections~\ref{sec:domain} and~\ref{sec:heterogeneity}) are referred to by seed.}
+\label{tab:runs}
+\end{table}
+
 \section{Model-Based A2C Across World-Model Checkpoints}
 \label{sec:app-ac}
 
-To see how imagination-trained policies depend on world-model quality, we trained one A2C agent on each of nine purposively sampled checkpoints of \texttt{12345-3080-R}, spanning early training, the pre-plateau, the MPC plateau and the smoothed-MPC oracle (WM~$60$ is a raw-MPC outlier whose $20$-episode mean spiked to $+173.5$ while the smoothed curve stayed below $+100$). All nine runs share the hyperparameters of Section~\ref{sec:ac} ($1000$ epochs, a checkpoint every $50$ epochs), and every saved actor is evaluated on $100$ deterministic episodes. Table~\ref{tab:ac-summary} reports, per world model, the A2C checkpoint with the highest mean return (best-by-mean, BBM) and the one with the highest worst-case return (safest-by-worst, SBW), the more useful pick for deployment.
+To see how imagination-trained policies depend on world-model quality, we trained one A2C agent on each of nine purposively sampled checkpoints of \texttt{12345-3080-R}, spanning early training, the pre-plateau, the MPC plateau and the smoothed-MPC oracle (WM~$60$ is a raw-MPC outlier whose $20$-episode mean spiked to $+173.5$ while the smoothed curve stayed below $+100$). All nine runs share the hyperparameters of Appendix~\ref{sec:app-model} ($1000$ epochs, a checkpoint every $50$ epochs), and every saved actor is evaluated on $100$ deterministic episodes. Table~\ref{tab:ac-summary} reports, per world model, the A2C checkpoint with the highest mean return (best-by-mean, BBM) and the one with the highest worst-case return (safest-by-worst, SBW), the more useful pick for deployment.
 
 \begin{table*}[htbp]
 \centering
@@ -562,7 +577,7 @@ $315$ & MPC plateau          & $800$  & $+178.0$ & $-203.5$ & $1$ & $63$ & $700$
 \bottomrule
 \end{tabular}%
 }
-\caption{A2C training outcomes across purposively sampled world-model checkpoints of \texttt{12345-3080-R}, $100$ deterministic episodes per A2C checkpoint. \textbf{Ep.}\ is the AC training epoch of the reported checkpoint; \textbf{mean}/\textbf{worst} are mean and worst-case return; \textbf{catas} counts episodes with return $<{-}100$, \textbf{perfect} counts $\geq{+}200$; \textbf{\#safe} is the number of A2C checkpoints (out of $20$) with $0$ catastrophic episodes.}
+\caption{A2C training outcomes across purposively sampled world-model checkpoints of \texttt{12345-3080-R}, $100$ deterministic episodes per A2C checkpoint. \textbf{Ep.}\ is the AC training epoch of the reported checkpoint; \textbf{mean}/\textbf{worst} are mean and worst-case return; \textbf{catas} counts episodes with return $<-100$, \textbf{perfect} counts $>+200$; \textbf{\#safe} is the number of A2C checkpoints (out of $20$) with $0$ catastrophic episodes.}
 \label{tab:ac-summary}
 \end{table*}
 
@@ -575,13 +590,38 @@ A deployable world model is one whose BBM and SBW checkpoints both have a high m
 
 \paragraph{Cross-pipeline agreement.} The ROF drawdowns of \texttt{12345-3080-R} and \texttt{12345-3080-C} reproduce to three decimals between our implementation and an independent one ($0.0609$ vs.\ $0.061$, $0.0642$ vs.\ $0.064$), and logged epoch-5 metrics reproduce to four decimals across PyTorch $1.12$ and $2.11$. Closed-loop return, by contrast, depends on the full training path (Section~\ref{sec:heterogeneity}).
 
+\section{ROF in Whitened Coordinates}
+\label{sec:app-coords}
+
+Under an invertible change of latent coordinates $\bm{s}' = T\bm{s}$, the linearization becomes $(TAT^{-1}, TB, CT^{-1}, RT^{-1})$, so $\mathcal{O}_H' = \mathcal{O}_H T^{-1}$ and $\ker \mathcal{O}_H' = T \ker \mathcal{O}_H$. Theorem~\ref{thm:support} is unchanged, but ROF, a ratio of Euclidean norms, is not: with $C = [1, 0]$, $R = [1, 1]$ and $T = \mathrm{diag}(a, 1)$ it goes from $1/2$ to $1/(1+a^2)$.
+
+For each checkpoint we estimate the latent covariance $\Sigma_s$ from $1024$ validation states, collected as the Jacobian states are (Section~\ref{sec:estimation}), and recompute ROF with $\mathcal{O}_H \Sigma_s^{1/2}$ and $\Sigma_s^{1/2}\bm{r}$ in place of $\mathcal{O}_H$ and $\bm{r}$, keeping the same $10^{-3}$ threshold. Since $\Sigma_s'^{1/2} = T\Sigma_s^{1/2}U$ with $U$ orthogonal, the whitened fraction is invariant to every invertible linear change of coordinates; it is the share of the linearized reward's variance over the validation states that lies in observable directions. On synthetic systems a random $T$ moved raw ROF from $0.849$ to $0.945$ and left the whitened value unchanged to six decimals. Computing the whitened fraction leaves every other logged quantity unchanged; the raw ROF values reproduce the original sweeps ($19$ of $7{,}200$ values differ, by at most $0.0002$). The comparisons in Table~\ref{tab:coords} and the criteria for their survival were specified before the whitened values were computed.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{@{}l l l@{}}
+\toprule
+\textbf{Comparison} & \textbf{Raw ROF} & \textbf{Whitened ROF} \\
+\midrule
+Bad-pool level, 12 runs: rank correlation with raw & $1$ & $-0.09$ \\
+Halving $d_h$: bad-pool level offset & $+0.098$ & $+0.007$ \\
+Halving $d_z$: bad-pool level offset & $+0.001$ & $+0.017$ \\
+$\bm{z}$-only vs.\ control (3080), good pool, epochs $\ge 400$ & $0.285$ vs.\ $0.196$ & $0.881$ vs.\ $0.836$ \\
+Within-run $\rho_s$(ROF, MPC), Reacher, 8 runs & $+0.26$ to $+0.87$ & $-0.73$ to $-0.40$ \\
+Within-run $\rho_s$(ROF, MPC), LunarLander, 8 runs & $-0.55$ to $+0.32$ & $+0.03$ to $+0.77$ \\
+\bottomrule
+\end{tabular}
+\caption{Raw and whitened ROF on the same checkpoints. Levels are seed-averaged means over epochs $\ge 50$; offsets are against the two standard runs on the same data. Within-run correlations use pool-averaged ROF against MA-7 MPC return. Raw values here come from a CPU recomputation and can differ in the third decimal from Table~\ref{tab:zonly}, which reports the original sweep.}
+\label{tab:coords}
+\end{table}
+
+Whitening also changes the level. In all $22$ LunarLander runs we recomputed, whitened ROF lies between $0.85$ and $0.93$ in both pools, against $0.20$ to $0.37$ raw: most of the reward gradient's Euclidean energy outside the observable subspace sits in directions along which the validation states barely vary.
+
 \section{Additional Probes of the Trained Model}
 \label{sec:app-probes}
 
 \paragraph{How the amortized posterior corrects errors.} Injecting state errors of matched magnitude and running the posterior on true observations, observable-direction errors \emph{persist} ($0.64$--$0.93$ of their initial norm after $10$ steps) while kernel-direction errors decay ($0.11$--$0.17$). This is the reverse of what a Kalman filter would do, and it follows from the architecture: the posterior resamples only $\bm{z}$, so error decay in $\bm{h}$ is governed by the trained recurrence, which contracts unused kernel directions and preserves the observable ones. Kalman-style intuitions about what imagination ``forgoes'' should therefore be applied to the $\bm{z}$-channel alone.
-
-\paragraph{ROF on random weights.} ROF reads learned structure rather than architecture: the spread of single-sensor ROF values across the eight observation channels is $0.036$ for a trained checkpoint against $0.004$ for the same network with random weights.
-
 \section{Offline Metric Screen}
 \label{sec:app-metrics}
 
