@@ -1,0 +1,23 @@
+﻿Re-evaluation session 20260928_235825  (episodes=100, deterministic)
+
+[wmac800_seed12345_cap600] exit=0  REPRODUCED (+217.48)
+[Run] mean_return=+217.48 worst_return=-178.86 main_action_mix=34.6% main_action_mix_air=53.2% near_avg_abs_angle=0.112 near_avg_down_speed=0.086 touchdown_median_abs_ang_vel=0.000 touchdown_p90_abs_ang_vel=0.000
+[Run] perfect=79 negative=4 catastrophic=2 avg_entropy=1.307 avg_steps=342.0
+
+[mfac760_seed12345_cap1000] exit=0  REPRODUCED (+193.04)
+[Run] mean_return=+193.04 worst_return=-35.55 main_action_mix=44.3% main_action_mix_air=56.5% near_avg_abs_angle=0.106 near_avg_down_speed=0.063 touchdown_median_abs_ang_vel=0.000 touchdown_p90_abs_ang_vel=0.000
+[Run] perfect=54 negative=3 catastrophic=0 avg_entropy=1.333 avg_steps=478.3
+
+[wmac800_seed99999_cap600] exit=0
+[Run] mean_return=+189.53 worst_return=-419.91 main_action_mix=33.7% main_action_mix_air=53.0% near_avg_abs_angle=0.126 near_avg_down_speed=0.084 touchdown_median_abs_ang_vel=0.000 touchdown_p90_abs_ang_vel=0.101
+[Run] perfect=70 negative=7 catastrophic=5 avg_entropy=1.307 avg_steps=352.5
+
+[mfac760_seed99999_cap1000] exit=0
+[Run] mean_return=+183.67 worst_return=-153.11 main_action_mix=42.6% main_action_mix_air=56.0% near_avg_abs_angle=0.120 near_avg_down_speed=0.060 touchdown_median_abs_ang_vel=0.000 touchdown_p90_abs_ang_vel=0.000
+[Run] perfect=49 negative=6 catastrophic=1 avg_entropy=1.326 avg_steps=499.6
+
+[wmac800_seed99999_cap1000] exit=0
+[Run] mean_return=+196.64 worst_return=-419.91 main_action_mix=31.9% main_action_mix_air=53.0% near_avg_abs_angle=0.130 near_avg_down_speed=0.077 touchdown_median_abs_ang_vel=0.000 touchdown_p90_abs_ang_vel=0.077
+[Run] perfect=74 negative=7 catastrophic=5 avg_entropy=1.307 avg_steps=373.4
+
+Total time: 5.8 min
