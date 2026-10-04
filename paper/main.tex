@@ -4,6 +4,7 @@
 \usepackage{bm}
 \usepackage{graphicx}
 \usepackage{booktabs}
+\usepackage{array}
 \usepackage{hyperref}
 \usepackage{multirow}
 
@@ -19,7 +20,7 @@
 \theoremstyle{remark}
 \newtheorem{remark}{Remark}
 
-\title{Reward Observability and the Limits of Offline Checkpoint Selection in RSSM Latent World Models}
+\title{Reward Observability and the Limits of Offline Checkpoint Selection in RSSM World Models}
 
 \author{Nikolai Smolyanskiy\thanks{Code and experimental data:
 \url{https://github.com/nsmoly/LunarLander_RSSM}. \newline
@@ -193,7 +194,9 @@ where $\bm{\mu}$ collects the known input contributions and $\bm{\eta}$ the prop
 For the model~\eqref{eq:lgss} with $\Sigma_v \succ 0$:
 \begin{enumerate}
 \item[(a)] $\ker J = \ker \mathcal{O}_H$, hence $\mathrm{range}(J) = \Obs_H$, for every admissible noise model $(Q, \Sigma_v)$.
-\item[(b)] The likelihood depends on the state only through its observable part: $p(\bm{o}_{0:H-1} \mid \bm{s}_0) = p(\bm{o}_{0:H-1} \mid P_{\Obs}\, \bm{s}_0)$. Consequently, for any proper prior over $\bm{s}_0$, $I(\bm{s}_0;\, \bm{o}_{0:H-1}) = I(P_{\Obs}\, \bm{s}_0;\, \bm{o}_{0:H-1})$.
+\item[(b)] The likelihood depends on the state only through its observable part:
+\[ p(\bm{o}_{0:H-1} \mid \bm{s}_0) = p(\bm{o}_{0:H-1} \mid P_{\Obs}\, \bm{s}_0). \]
+Consequently, for any proper prior over $\bm{s}_0$, $I(\bm{s}_0;\, \bm{o}_{0:H-1}) = I(P_{\Obs}\, \bm{s}_0;\, \bm{o}_{0:H-1})$.
 \end{enumerate}
 \end{theorem}
 
@@ -441,7 +444,7 @@ Table~\ref{tab:negative} summarizes every test.
 \footnotesize
 \setlength{\tabcolsep}{4pt}
 \renewcommand{\arraystretch}{1.15}
-\begin{tabular}{@{}p{3.6cm} p{5.1cm} p{1.7cm} p{5.3cm}@{}}
+\begin{tabular}{@{}p{3.5cm} p{5.1cm} p{1.7cm} p{5.3cm}@{}}
 \toprule
 \textbf{Test} & \textbf{What was measured} & \textbf{Runs} & \textbf{Result} \\
 \midrule
@@ -528,7 +531,7 @@ is the posterior--prior KL divergence.
 \begin{table}[htbp]
 \centering
 \small
-\begin{tabular}{@{}l l l@{}}
+\begin{tabular}{@{}l >{\raggedright\arraybackslash}p{6.4cm} >{\raggedright\arraybackslash}p{2.9cm}@{}}
 \toprule
 \textbf{Tag} & \textbf{Training} & \textbf{Hardware} \\
 \midrule
@@ -593,7 +596,7 @@ A deployable world model is one whose BBM and SBW checkpoints both have a high m
 \section{ROF in Whitened Coordinates}
 \label{sec:app-coords}
 
-Under an invertible change of latent coordinates $\bm{s}' = T\bm{s}$, the linearization becomes $(TAT^{-1}, TB, CT^{-1}, RT^{-1})$, so $\mathcal{O}_H' = \mathcal{O}_H T^{-1}$ and $\ker \mathcal{O}_H' = T \ker \mathcal{O}_H$. Theorem~\ref{thm:support} is unchanged, but ROF, a ratio of Euclidean norms, is not: with $C = [1, 0]$, $R = [1, 1]$ and $T = \mathrm{diag}(a, 1)$ it goes from $1/2$ to $1/(1+a^2)$.
+Under an invertible change of latent coordinates $\bm{s}' = T\bm{s}$, the linearization matrices become $TAT^{-1}$, $TB$, $CT^{-1}$ and $RT^{-1}$, so $\mathcal{O}_H' = \mathcal{O}_H T^{-1}$ and $\ker \mathcal{O}_H' = T \ker \mathcal{O}_H$. Theorem~\ref{thm:support} is unchanged, but ROF, a ratio of Euclidean norms, is not: with $C = [1, 0]$, $R = [1, 1]$ and $T = \mathrm{diag}(a, 1)$ it goes from $1/2$ to $1/(1+a^2)$.
 
 For each checkpoint we estimate the latent covariance $\Sigma_s$ from $1024$ validation states, collected as the Jacobian states are (Section~\ref{sec:estimation}), and recompute ROF with $\mathcal{O}_H \Sigma_s^{1/2}$ and $\Sigma_s^{1/2}\bm{r}$ in place of $\mathcal{O}_H$ and $\bm{r}$, keeping the same $10^{-3}$ threshold. Since $\Sigma_s'^{1/2} = T\Sigma_s^{1/2}U$ with $U$ orthogonal, the whitened fraction is invariant to every invertible linear change of coordinates; it is the share of the linearized reward's variance over the validation states that lies in observable directions. On synthetic systems a random $T$ moved raw ROF from $0.849$ to $0.945$ and left the whitened value unchanged to six decimals. Computing the whitened fraction leaves every other logged quantity unchanged; the raw ROF values reproduce the original sweeps ($19$ of $7{,}200$ values differ, by at most $0.0002$).
 
