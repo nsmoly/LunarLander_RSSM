@@ -11,8 +11,9 @@ Run tags follow the paper: <seed>-<GPU>-<protocol>, with protocol C = one
 continuous run, R = resumed at epoch 300, A = AdamW moments reset at epoch 300
 (weights copied from the C run up to 300), Z = reward head reads z only.
 
-Reads logs from this repository and from the crof_reproduction repository,
-which is expected to sit next to LunarLander_RSSM.
+Reads logs from this repository and from the rof-reproduction repository
+(https://github.com/jonstraveladventures/rof-reproduction), which is expected
+to be cloned next to LunarLander_RSSM.
 
     python paper/make_revision_figures.py
 """
@@ -29,14 +30,14 @@ import numpy as np
 
 PAPER = Path(__file__).resolve().parent
 ROOT = PAPER.parent
-CROF = ROOT.parent / "crof_reproduction"
-RES = CROF / "results"
+REPRO = ROOT.parent / "rof-reproduction"
+RES = REPRO / "results"
 OUT = PAPER / "figures"
 
 sys.path.insert(0, str(ROOT))
 from parse_mpc_sweep_777 import centred_ma, parse_log  # noqa: E402
 
-spec = importlib.util.spec_from_file_location("an", CROF / "analyze_llc.py")
+spec = importlib.util.spec_from_file_location("an", REPRO / "analyze_llc.py")
 an = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(an)
 
@@ -139,7 +140,7 @@ def fig_zonly(kind, ylabel, out_name, figsize):
 
 
 # ---------------------------------------------------------------------------
-# Two-environment contrast (same statistics as crof_reproduction's
+# Two-environment contrast (same statistics as rof-reproduction's
 # make_contrast_figure.py, reimplemented so its repo is not written to)
 # ---------------------------------------------------------------------------
 PANEL = [101, 202, 303, 404, 505, 606, 707, 808]
@@ -161,8 +162,8 @@ def fig_two_env():
     ll = [(f"seed {s}", run_stats(RES / (f"mpc_sp{s}.txt" if s != 707 else "mpc_sp707_merged.txt"),
                                   RES / f"metrics_sp{s}_seed*.txt"), None) for s in PANEL]
     ll += [("777-L40S-C (ref)", run_stats(RES / "mpc_dq_f1rs.txt", RES / "metrics_dq_f1rs_seed*.txt"), C_777),
-           ("12345-3080-R (ref)", run_stats(CROF / "logs" / "mpc_eval_logs.txt",
-                                            CROF / "logs" / "metrics_eval_logs.txt"), C_REF)]
+           ("12345-3080-R (ref)", run_stats(REPRO / "logs" / "mpc_eval_logs.txt",
+                                            REPRO / "logs" / "metrics_eval_logs.txt"), C_REF)]
     rc = [(f"seed {s}", run_stats(RES / f"mpc_r{s}.txt", RES / f"metrics_r{s}_seed*.txt"), None) for s in PANEL]
 
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.8), sharex=True)
