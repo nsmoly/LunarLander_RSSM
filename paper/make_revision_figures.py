@@ -11,7 +11,7 @@ Run tags follow the paper: <seed>-<GPU>-<protocol>, with protocol C = one
 continuous run, R = resumed at epoch 300, A = AdamW moments reset at epoch 300
 (weights copied from the C run up to 300), Z = reward head reads z only.
 
-Reads logs from this repository and from the rof-reproduction repository
+Reads logs from this repository's logs/ folder and from the rof-reproduction repository
 (https://github.com/jonstraveladventures/rof-reproduction), which is expected
 to be cloned next to LunarLander_RSSM.
 
@@ -30,6 +30,7 @@ import numpy as np
 
 PAPER = Path(__file__).resolve().parent
 ROOT = PAPER.parent
+LOGS = ROOT / "logs"
 REPRO = ROOT.parent / "rof-reproduction"
 RES = REPRO / "results"
 OUT = PAPER / "figures"
@@ -50,13 +51,13 @@ WARMUP = 50
 ALL_RUNS = [
     # collapsed (reds)
     ("12345-3080-C", RES / "mpc_v7_12345_continuous.txt", "#8B0000", "-", 2.6, "collapse"),
-    ("12345-3080-R", PAPER / "logs" / "mpc_eval_logs.txt", "#E04B2A", "-", 2.6, "collapse"),
+    ("12345-3080-R", LOGS / "mpc_eval_logs.txt", "#E04B2A", "-", 2.6, "collapse"),
     # degraded (amber)
-    ("12345-5090-A", ROOT / "mpc_eval_logs_seed12345resume.txt", "#E8A33D", "-", 2.6, "degraded"),
+    ("12345-5090-A", LOGS / "mpc_eval_logs_12345-5090-A.txt", "#E8A33D", "-", 2.6, "degraded"),
     # healthy (greens)
-    ("12345-5090-C", ROOT / "mpc_eval_logs_seed12345continuous.txt", "#1B7F3B", "-", 2.4, "healthy"),
-    ("777-3080-C", ROOT / "mpc_eval_logs_seed777.txt", "#4FAE5A", "-", 2.2, "healthy"),
-    ("777-5090-A", ROOT / "mpc_eval_logs_seed777resume.txt", "#7FC97F", "--", 2.2, "healthy"),
+    ("12345-5090-C", LOGS / "mpc_eval_logs_12345-5090-C.txt", "#1B7F3B", "-", 2.4, "healthy"),
+    ("777-3080-C", LOGS / "mpc_eval_logs_777-3080-C.txt", "#4FAE5A", "-", 2.2, "healthy"),
+    ("777-5090-A", LOGS / "mpc_eval_logs_777-5090-A.txt", "#7FC97F", "--", 2.2, "healthy"),
     ("777-L40S-C", RES / "mpc_dq_f1rs.txt", "#2E8B8B", ":", 2.2, "healthy"),
 ]
 
