@@ -1,0 +1,153 @@
+# python -u wm_mpc_policy.py --world_model checkpoints_paper_seed12345resumed\world_model_20260402_011236_epoch_310.pt --episodes 20 --seed 12345 --max_steps 600
+pygame 2.6.1 (SDL 2.28.4, Python 3.11.9)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+Controls: R toggle render, Q or ESC quit. Actions: 0=idle, 1=left side, 2=main, 3=right side
+obs_cost=OFF
+[Episode 1] return=+22.42, steps=249, done=True, elapsed=24.2s
+[Episode 1] action_mix 0:10.4% 1:17.7% 2:55.0% 3:16.9%
+[Episode 1] action_mix_air 0:10.1% 1:17.8% 2:55.5% 3:16.6%
+[Episode 1] planner_avg score=+4.170 step0_reward=+0.156 step0_cost=+0.000
+[Episode 1] extrema min_y=+0.012 max_abs_angle=0.208 max_down_speed=0.488 max_abs_vx=0.626
+[Episode 1] near_ground(y<0.35) avg_abs_angle=0.094 avg_down_speed=0.199 avg_abs_vx=0.139
+[Episode 1] touchdown x=-0.373 y=+0.012 vx=+0.052 vy=-0.026 angle=-0.015 ang_vel=-0.295
+[Episode 2] return=-138.21, steps=474, done=True, elapsed=45.9s
+[Episode 2] action_mix 0:8.9% 1:23.6% 2:53.0% 3:14.6%
+[Episode 2] action_mix_air 0:8.1% 1:20.7% 2:52.4% 3:18.7%
+[Episode 2] planner_avg score=+2.888 step0_reward=+0.060 step0_cost=+0.000
+[Episode 2] extrema min_y=-0.398 max_abs_angle=0.493 max_down_speed=0.541 max_abs_vx=0.839
+[Episode 2] near_ground(y<0.35) avg_abs_angle=0.185 avg_down_speed=0.197 avg_abs_vx=0.276
+[Episode 2] touchdown x=+0.952 y=-0.395 vx=+0.499 vy=+0.087 angle=+0.173 ang_vel=-0.162
+[Episode 3] return=+204.85, steps=331, done=True, elapsed=28.2s
+[Episode 3] action_mix 0:26.0% 1:14.5% 2:44.4% 3:15.1%
+[Episode 3] action_mix_air 0:13.6% 1:17.6% 2:51.6% 3:17.2%
+[Episode 3] planner_avg score=+3.261 step0_reward=+0.082 step0_cost=+0.000
+[Episode 3] extrema min_y=-0.018 max_abs_angle=0.160 max_down_speed=0.396 max_abs_vx=0.255
+[Episode 3] near_ground(y<0.35) avg_abs_angle=0.064 avg_down_speed=0.138 avg_abs_vx=0.056
+[Episode 3] touchdown x=+0.179 y=+0.004 vx=+0.000 vy=+0.000 angle=+0.039 ang_vel=+0.000
+[Episode 4] return=+250.42, steps=294, done=True, elapsed=23.8s
+[Episode 4] action_mix 0:27.6% 1:15.0% 2:43.2% 3:14.3%
+[Episode 4] action_mix_air 0:6.0% 1:19.4% 2:55.3% 3:19.4%
+[Episode 4] planner_avg score=+3.833 step0_reward=+0.118 step0_cost=+0.000
+[Episode 4] extrema min_y=-0.024 max_abs_angle=0.198 max_down_speed=0.469 max_abs_vx=0.326
+[Episode 4] near_ground(y<0.35) avg_abs_angle=0.072 avg_down_speed=0.124 avg_abs_vx=0.089
+[Episode 4] touchdown x=+0.121 y=-0.002 vx=+0.000 vy=+0.000 angle=-0.002 ang_vel=+0.000
+[Episode 5] return=-30.13, steps=324, done=True, elapsed=31.2s
+[Episode 5] action_mix 0:8.6% 1:21.0% 2:51.9% 3:18.5%
+[Episode 5] action_mix_air 0:8.4% 1:21.1% 2:52.0% 3:18.6%
+[Episode 5] planner_avg score=+3.388 step0_reward=+0.053 step0_cost=+0.000
+[Episode 5] extrema min_y=+0.028 max_abs_angle=0.245 max_down_speed=0.564 max_abs_vx=0.716
+[Episode 5] near_ground(y<0.35) avg_abs_angle=0.077 avg_down_speed=0.300 avg_abs_vx=0.151
+[Episode 5] touchdown x=+0.734 y=+0.028 vx=+0.195 vy=-0.053 angle=-0.221 ang_vel=+0.210
+[Episode 6] return=+264.41, steps=293, done=True, elapsed=24.9s
+[Episode 6] action_mix 0:22.5% 1:14.0% 2:47.8% 3:15.7%
+[Episode 6] action_mix_air 0:8.0% 1:16.8% 2:56.3% 3:18.9%
+[Episode 6] planner_avg score=+3.465 step0_reward=+0.121 step0_cost=+0.000
+[Episode 6] extrema min_y=-0.013 max_abs_angle=0.212 max_down_speed=0.495 max_abs_vx=0.445
+[Episode 6] near_ground(y<0.35) avg_abs_angle=0.053 avg_down_speed=0.140 avg_abs_vx=0.120
+[Episode 6] touchdown x=-0.007 y=-0.001 vx=+0.000 vy=+0.000 angle=+0.001 ang_vel=+0.000
+[Episode 7] return=+254.62, steps=369, done=True, elapsed=33.1s
+[Episode 7] action_mix 0:18.2% 1:16.0% 2:43.9% 3:22.0%
+[Episode 7] action_mix_air 0:6.8% 1:17.3% 2:58.3% 3:17.7%
+[Episode 7] planner_avg score=+3.031 step0_reward=+0.104 step0_cost=+0.000
+[Episode 7] extrema min_y=-0.013 max_abs_angle=0.145 max_down_speed=0.462 max_abs_vx=0.376
+[Episode 7] near_ground(y<0.35) avg_abs_angle=0.024 avg_down_speed=0.087 avg_abs_vx=0.039
+[Episode 7] touchdown x=-0.071 y=-0.001 vx=+0.000 vy=+0.000 angle=-0.002 ang_vel=+0.000
+[Episode 8] return=+231.93, steps=325, done=True, elapsed=27.4s
+[Episode 8] action_mix 0:23.1% 1:16.9% 2:43.4% 3:16.6%
+[Episode 8] action_mix_air 0:8.8% 1:21.0% 2:50.8% 3:19.5%
+[Episode 8] planner_avg score=+3.353 step0_reward=+0.081 step0_cost=+0.000
+[Episode 8] extrema min_y=-0.037 max_abs_angle=0.127 max_down_speed=0.533 max_abs_vx=0.491
+[Episode 8] near_ground(y<0.35) avg_abs_angle=0.045 avg_down_speed=0.163 avg_abs_vx=0.049
+[Episode 8] touchdown x=+0.430 y=-0.024 vx=+0.000 vy=+0.000 angle=-0.018 ang_vel=+0.000
+[Episode 9] return=-19.10, steps=307, done=True, elapsed=30.0s
+[Episode 9] action_mix 0:9.4% 1:18.6% 2:54.7% 3:17.3%
+[Episode 9] action_mix_air 0:9.2% 1:18.7% 2:54.4% 3:17.7%
+[Episode 9] planner_avg score=+3.356 step0_reward=+0.086 step0_cost=+0.000
+[Episode 9] extrema min_y=-0.034 max_abs_angle=0.188 max_down_speed=0.411 max_abs_vx=0.193
+[Episode 9] near_ground(y<0.35) avg_abs_angle=0.043 avg_down_speed=0.201 avg_abs_vx=0.097
+[Episode 9] touchdown x=+0.172 y=-0.034 vx=+0.079 vy=-0.015 angle=-0.176 ang_vel=+0.078
+[Episode 10] return=-25.27, steps=307, done=True, elapsed=29.6s
+[Episode 10] action_mix 0:8.1% 1:21.2% 2:51.5% 3:19.2%
+[Episode 10] action_mix_air 0:8.3% 1:21.1% 2:51.5% 3:19.1%
+[Episode 10] planner_avg score=+3.432 step0_reward=+0.072 step0_cost=+0.000
+[Episode 10] extrema min_y=+0.040 max_abs_angle=0.200 max_down_speed=0.504 max_abs_vx=0.718
+[Episode 10] near_ground(y<0.35) avg_abs_angle=0.036 avg_down_speed=0.320 avg_abs_vx=0.024
+[Episode 10] touchdown x=+0.594 y=+0.040 vx=+0.057 vy=+0.005 angle=-0.121 ang_vel=-0.253
+[Episode 11] return=+195.89, steps=428, done=True, elapsed=39.5s
+[Episode 11] action_mix 0:14.3% 1:25.2% 2:44.9% 3:15.7%
+[Episode 11] action_mix_air 0:7.4% 1:21.5% 2:51.8% 3:19.3%
+[Episode 11] planner_avg score=+3.508 step0_reward=+0.100 step0_cost=+0.000
+[Episode 11] extrema min_y=-0.156 max_abs_angle=0.359 max_down_speed=0.523 max_abs_vx=0.506
+[Episode 11] near_ground(y<0.35) avg_abs_angle=0.132 avg_down_speed=0.159 avg_abs_vx=0.083
+[Episode 11] touchdown x=+0.526 y=-0.147 vx=+0.000 vy=+0.000 angle=-0.193 ang_vel=+0.000
+[Episode 12] return=+237.71, steps=465, done=True, elapsed=42.9s
+[Episode 12] action_mix 0:15.3% 1:14.8% 2:40.2% 3:29.7%
+[Episode 12] action_mix_air 0:9.1% 1:15.2% 2:46.2% 3:29.5%
+[Episode 12] planner_avg score=+3.499 step0_reward=+0.088 step0_cost=+0.000
+[Episode 12] extrema min_y=-0.002 max_abs_angle=0.517 max_down_speed=0.432 max_abs_vx=0.346
+[Episode 12] near_ground(y<0.35) avg_abs_angle=0.183 avg_down_speed=0.092 avg_abs_vx=0.156
+[Episode 12] touchdown x=+0.081 y=-0.001 vx=+0.000 vy=+0.000 angle=+0.001 ang_vel=+0.000
+[Episode 13] return=+237.27, steps=337, done=True, elapsed=29.4s
+[Episode 13] action_mix 0:23.7% 1:15.4% 2:45.7% 3:15.1%
+[Episode 13] action_mix_air 0:13.4% 1:17.0% 2:52.3% 3:17.3%
+[Episode 13] planner_avg score=+3.019 step0_reward=+0.073 step0_cost=+0.000
+[Episode 13] extrema min_y=-0.014 max_abs_angle=0.135 max_down_speed=0.436 max_abs_vx=0.235
+[Episode 13] near_ground(y<0.35) avg_abs_angle=0.040 avg_down_speed=0.150 avg_abs_vx=0.049
+[Episode 13] touchdown x=-0.046 y=-0.001 vx=+0.000 vy=+0.000 angle=-0.001 ang_vel=+0.000
+[Episode 14] return=+5.14, steps=205, done=True, elapsed=20.1s
+[Episode 14] action_mix 0:7.8% 1:17.1% 2:54.6% 3:20.5%
+[Episode 14] action_mix_air 0:8.0% 1:17.5% 2:54.5% 3:20.0%
+[Episode 14] planner_avg score=+4.888 step0_reward=+0.188 step0_cost=+0.000
+[Episode 14] extrema min_y=-0.031 max_abs_angle=0.251 max_down_speed=0.607 max_abs_vx=0.807
+[Episode 14] near_ground(y<0.35) avg_abs_angle=0.080 avg_down_speed=0.210 avg_abs_vx=0.071
+[Episode 14] touchdown x=-0.568 y=-0.031 vx=+0.034 vy=-0.135 angle=+0.007 ang_vel=-1.263
+[Episode 15] return=+220.22, steps=335, done=True, elapsed=30.0s
+[Episode 15] action_mix 0:21.5% 1:15.8% 2:48.1% 3:14.6%
+[Episode 15] action_mix_air 0:10.5% 1:18.5% 2:54.9% 3:16.1%
+[Episode 15] planner_avg score=+2.872 step0_reward=+0.090 step0_cost=+0.000
+[Episode 15] extrema min_y=-0.009 max_abs_angle=0.144 max_down_speed=0.337 max_abs_vx=0.156
+[Episode 15] near_ground(y<0.35) avg_abs_angle=0.027 avg_down_speed=0.139 avg_abs_vx=0.059
+[Episode 15] touchdown x=+0.081 y=-0.000 vx=+0.000 vy=+0.000 angle=-0.004 ang_vel=+0.000
+[Episode 16] return=+17.52, steps=600, done=False, elapsed=51.5s
+[Episode 16] action_mix 0:22.8% 1:40.2% 2:29.8% 3:7.2%
+[Episode 16] action_mix_air 0:9.1% 1:17.8% 2:56.2% 3:16.9%
+[Episode 16] planner_avg score=+3.071 step0_reward=+0.083 step0_cost=+0.000
+[Episode 16] extrema min_y=-0.182 max_abs_angle=0.480 max_down_speed=0.515 max_abs_vx=0.399
+[Episode 16] near_ground(y<0.35) avg_abs_angle=0.269 avg_down_speed=0.062 avg_abs_vx=0.144
+[Episode 17] return=+89.82, steps=600, done=False, elapsed=36.9s
+[Episode 17] action_mix 0:50.2% 1:10.5% 2:30.0% 3:9.3%
+[Episode 17] action_mix_air 0:8.8% 1:19.2% 2:54.9% 3:17.1%
+[Episode 17] planner_avg score=+1.603 step0_reward=+0.040 step0_cost=+0.000
+[Episode 17] extrema min_y=+0.023 max_abs_angle=0.425 max_down_speed=0.400 max_abs_vx=0.197
+[Episode 17] near_ground(y<0.35) avg_abs_angle=0.227 avg_down_speed=0.041 avg_abs_vx=0.040
+[Episode 18] return=+225.47, steps=360, done=True, elapsed=30.7s
+[Episode 18] action_mix 0:20.8% 1:16.4% 2:47.8% 3:15.0%
+[Episode 18] action_mix_air 0:8.2% 1:19.4% 2:54.9% 3:17.4%
+[Episode 18] planner_avg score=+2.840 step0_reward=+0.082 step0_cost=+0.000
+[Episode 18] extrema min_y=-0.016 max_abs_angle=0.141 max_down_speed=0.394 max_abs_vx=0.390
+[Episode 18] near_ground(y<0.35) avg_abs_angle=0.026 avg_down_speed=0.119 avg_abs_vx=0.031
+[Episode 18] touchdown x=+0.175 y=+0.004 vx=+0.000 vy=+0.000 angle=+0.040 ang_vel=+0.000
+[Episode 19] return=+263.30, steps=296, done=True, elapsed=25.0s
+[Episode 19] action_mix 0:21.6% 1:14.2% 2:48.0% 3:16.2%
+[Episode 19] action_mix_air 0:7.8% 1:17.2% 2:56.6% 3:18.4%
+[Episode 19] planner_avg score=+3.523 step0_reward=+0.109 step0_cost=+0.000
+[Episode 19] extrema min_y=-0.013 max_abs_angle=0.205 max_down_speed=0.439 max_abs_vx=0.301
+[Episode 19] near_ground(y<0.35) avg_abs_angle=0.040 avg_down_speed=0.133 avg_abs_vx=0.025
+[Episode 19] touchdown x=-0.035 y=-0.001 vx=+0.000 vy=+0.000 angle=-0.001 ang_vel=+0.000
+[Episode 20] return=+196.30, steps=370, done=True, elapsed=33.2s
+[Episode 20] action_mix 0:15.7% 1:15.4% 2:49.5% 3:19.5%
+[Episode 20] action_mix_air 0:7.3% 1:16.5% 2:57.8% 3:18.5%
+[Episode 20] planner_avg score=+2.808 step0_reward=+0.098 step0_cost=+0.000
+[Episode 20] extrema min_y=-0.016 max_abs_angle=0.114 max_down_speed=0.359 max_abs_vx=0.184
+[Episode 20] near_ground(y<0.35) avg_abs_angle=0.017 avg_down_speed=0.115 avg_abs_vx=0.076
+[Episode 20] touchdown x=+0.101 y=-0.001 vx=+0.000 vy=+0.000 angle=+0.002 ang_vel=+0.000
+[Run] ===== Checklist Scorecard =====
+[Run] mean_return=+135.23 worst_return=-138.21 main_action_mix=44.9% main_action_mix_air=53.6% near_avg_abs_angle=0.120 near_avg_down_speed=0.123 touchdown_median_abs_ang_vel=0.000 touchdown_p90_abs_ang_vel=0.265
+[Run] OK  mean_return >= -65
+[Run] BAD worst_return >= -120
+[Run] OK  near_ground avg_down_speed <= 0.75
+[Run] OK  near_ground avg_abs_angle <= 0.35
+[Run] OK  touchdown median abs(ang_vel) <= 2.0
+[Run] OK  touchdown p90 abs(ang_vel) <= 3.0
+[Run] OK  main action mix in [35%, 55%] (air only)
+[Run] verdict=PASS (6/7 checks passed)
