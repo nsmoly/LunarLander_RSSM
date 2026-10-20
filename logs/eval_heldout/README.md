@@ -38,6 +38,11 @@ made from; the repository copies are byte-identical (same SHA-256).
   on WM 280 and `777-5090-A`; session `20261014_223629` has MPC and A2C on WM 310.
 - `SUMMARY.txt`: all policies together (sanity checks, held-out table, paired
   bootstrap differences), from `eval_scripts/summarize_heldout.py`.
+- `sel3080_20260507_121538_mpc_12345-3080-R_wm310_seed12345_n100.txt`: the
+  original RTX 3080 run (torch 1.12.1, Python 3.9.13) behind the paper's MPC
+  selection score of +166.60: WM 310, 100 episodes, seed 12345, 600-step cap.
+  Its first 20 episodes are identical to the 20-episode sweep that chose WM 310
+  (+156.0). Not read by `summarize_heldout.py`.
 
 ## Results (100 held-out episodes)
 
