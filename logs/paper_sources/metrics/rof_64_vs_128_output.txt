@@ -1,0 +1,20 @@
+=== 12345-5090-C (continuous), field jac_rof, 90 checkpoints, epochs 55-500
+  Same metric seed (12345), 64 vs 128 states:
+    mean 64 = 0.2206   mean 128 = 0.2206
+    per-checkpoint Pearson r = 0.50
+    mean |64 - 128| = 0.0090
+    within-run s.d. (128 states, seed 12345) = 0.0112
+  Standard error of a window mean, epochs 400-500 (21 checkpoints x 3 metric seeds = 63 values):
+    from s.d. across metric seeds (0.0049): 0.0006
+    from the 64-vs-128 differences (0.0080 per estimate): 0.0010
+
+=== 12345-5090-A (resume), field jac_rof, 90 checkpoints, epochs 55-500
+  Same metric seed (12345), 64 vs 128 states:
+    mean 64 = 0.2198   mean 128 = 0.2208
+    per-checkpoint Pearson r = 0.51
+    mean |64 - 128| = 0.0093
+    within-run s.d. (128 states, seed 12345) = 0.0116
+  Standard error of a window mean, epochs 400-500 (21 checkpoints x 3 metric seeds = 63 values):
+    from s.d. across metric seeds (0.0057): 0.0007
+    from the 64-vs-128 differences (0.0082 per estimate): 0.0010
+

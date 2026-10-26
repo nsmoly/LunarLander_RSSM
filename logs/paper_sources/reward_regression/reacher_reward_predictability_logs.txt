@@ -1,0 +1,61 @@
+==============================================================================
+Reacher Reward-Predictability Test (L1)  --  2026-05-17 00:08:53
+==============================================================================
+train_dataset = reacher_rssm/reacher_train_dataset.npz
+val_dataset   = reacher_rssm/reacher_val_dataset.npz
+device        = cuda
+hidden        = 256, depth = 2
+epochs        = 80, batch_size = 2048, lr = 0.001
+
+Dataset sizes:
+  train: N=150000, obs_dim=10, action_dim=2
+  val  : N=24000
+  train 2-step valid: 148500 / 150000
+  val   2-step valid: 23760 / 24000
+  reward stats (train): mean=-0.6546  std=0.7928  min=-2.4070  max=-0.0000
+  reward stats (val)  : mean=-0.6542  std=0.7849  min=-2.4053  max=-0.0001
+
+------------------------------------------------------------------------------
+1-step regressor   r_t = f(o_t, a_t)   inputs: 12-D = obs(10) + act(2)
+------------------------------------------------------------------------------
+  Linear baseline:
+    train R^2 = 0.0822    val R^2 = 0.0779
+  MLP regressor:
+      [1-step MLP] epoch   1/80  train_mse=0.1268  train_R^2=0.9873  val_R^2=0.9873  best_val_R^2=0.9873
+      [1-step MLP] epoch  10/80  train_mse=0.0006  train_R^2=0.9991  val_R^2=0.9989  best_val_R^2=0.9989
+      [1-step MLP] epoch  20/80  train_mse=0.0003  train_R^2=0.9995  val_R^2=0.9994  best_val_R^2=0.9994
+      [1-step MLP] epoch  30/80  train_mse=0.0002  train_R^2=0.9997  val_R^2=0.9996  best_val_R^2=0.9996
+      [1-step MLP] epoch  40/80  train_mse=0.0002  train_R^2=0.9996  val_R^2=0.9995  best_val_R^2=0.9996
+      [1-step MLP] epoch  50/80  train_mse=0.0001  train_R^2=0.9998  val_R^2=0.9997  best_val_R^2=0.9997
+      [1-step MLP] epoch  60/80  train_mse=0.0002  train_R^2=0.9998  val_R^2=0.9997  best_val_R^2=0.9997
+      [1-step MLP] epoch  70/80  train_mse=0.0001  train_R^2=0.9999  val_R^2=0.9998  best_val_R^2=0.9998
+      [1-step MLP] epoch  80/80  train_mse=0.0002  train_R^2=0.9998  val_R^2=0.9997  best_val_R^2=0.9998
+    train R^2 = 0.9999    val R^2 = 0.9998
+
+------------------------------------------------------------------------------
+2-step regressor   r_t = f(o_{t-1}, o_t, a_t)   inputs: 22-D = prev(10) + obs(10) + act(2)
+------------------------------------------------------------------------------
+  Linear baseline:
+    train R^2 = 0.0776    val R^2 = 0.0740
+  MLP regressor:
+      [2-step MLP] epoch   1/80  train_mse=0.1810  train_R^2=0.9760  val_R^2=0.9746  best_val_R^2=0.9746
+      [2-step MLP] epoch  10/80  train_mse=0.0007  train_R^2=0.9990  val_R^2=0.9988  best_val_R^2=0.9988
+      [2-step MLP] epoch  20/80  train_mse=0.0003  train_R^2=0.9995  val_R^2=0.9993  best_val_R^2=0.9993
+      [2-step MLP] epoch  30/80  train_mse=0.0002  train_R^2=0.9995  val_R^2=0.9993  best_val_R^2=0.9995
+      [2-step MLP] epoch  40/80  train_mse=0.0002  train_R^2=0.9997  val_R^2=0.9995  best_val_R^2=0.9996
+      [2-step MLP] epoch  50/80  train_mse=0.0002  train_R^2=0.9996  val_R^2=0.9995  best_val_R^2=0.9997
+      [2-step MLP] epoch  60/80  train_mse=0.0001  train_R^2=0.9998  val_R^2=0.9997  best_val_R^2=0.9997
+      [2-step MLP] epoch  70/80  train_mse=0.0002  train_R^2=0.9998  val_R^2=0.9997  best_val_R^2=0.9997
+      [2-step MLP] epoch  80/80  train_mse=0.0001  train_R^2=0.9999  val_R^2=0.9997  best_val_R^2=0.9997
+    train R^2 = 0.9999    val R^2 = 0.9997
+
+==============================================================================
+Summary  (Reacher)
+==============================================================================
+  1-step Linear  val R^2 = 0.0779
+  1-step MLP     val R^2 = 0.9998
+  2-step Linear  val R^2 = 0.0740
+  2-step MLP     val R^2 = 0.9997
+  delta(2-step - 1-step) MLP = -0.0000   (positive = history adds info)
+  -> Reward is essentially Markovian in (o, a).  Latent history adds nothing.
+==============================================================================

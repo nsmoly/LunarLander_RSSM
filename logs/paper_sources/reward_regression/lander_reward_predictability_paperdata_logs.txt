@@ -1,0 +1,59 @@
+==============================================================================
+LunarLander Reward-Predictability Test (L1)  --  2026-10-25 15:19:49
+==============================================================================
+train_dataset = lunarlander_train_dataset.npz
+val_dataset   = lunarlander_val_dataset.npz
+device        = cuda
+hidden        = 256, depth = 2
+epochs        = 80, batch_size = 2048, lr = 0.001
+filter_terminals = False
+use_next_obs     = False
+
+Dataset sizes:
+  train: N=158685, obs_dim=8, action_onehot_dim=4 (#classes=4)
+  val  : N=22231
+  train 2-step valid: 157935 / 158685
+  val   2-step valid: 22109 / 22231
+  reward stats (train): mean=-0.1804  std=7.6906  min=-100.0000  max=123.7079
+  reward stats (val)  : mean=-0.2773  std=8.1695  min=-100.0000  max=110.8778
+
+------------------------------------------------------------------------------
+1-step regressor   r_t = f(o_t, a_t)   inputs: 12-D = obs(8) + act_onehot(4)
+------------------------------------------------------------------------------
+  Linear baseline:
+    train R^2 = 0.0177    val R^2 = 0.0248
+  MLP regressor:
+      [1-step MLP] epoch   1/80  train_mse=52.5863  train_R^2=0.1512  val_R^2=0.1597  best_val_R^2=0.1597
+      [1-step MLP] epoch  10/80  train_mse=45.1192  train_R^2=0.2418  val_R^2=0.2191  best_val_R^2=0.2191
+      [1-step MLP] epoch  20/80  train_mse=44.1421  train_R^2=0.2633  val_R^2=0.2269  best_val_R^2=0.2304
+      [1-step MLP] epoch  30/80  train_mse=43.4699  train_R^2=0.2752  val_R^2=0.2323  best_val_R^2=0.2323
+      [1-step MLP] epoch  40/80  train_mse=42.5301  train_R^2=0.2877  val_R^2=0.2361  best_val_R^2=0.2365
+      [1-step MLP] early stopping at epoch 42 (no improvement for 10 epochs)
+    train R^2 = 0.2795    val R^2 = 0.2365
+
+------------------------------------------------------------------------------
+2-step regressor   r_t = f(o_{t-1}, o_t, a_t)   inputs: 20-D = prev(8) + obs(8) + act(4)
+------------------------------------------------------------------------------
+  Linear baseline:
+    train R^2 = 0.0503    val R^2 = 0.0536
+  MLP regressor:
+      [2-step MLP] epoch   1/80  train_mse=52.5863  train_R^2=0.1594  val_R^2=0.1657  best_val_R^2=0.1657
+      [2-step MLP] epoch  10/80  train_mse=44.1252  train_R^2=0.2704  val_R^2=0.2470  best_val_R^2=0.2470
+      [2-step MLP] epoch  20/80  train_mse=42.4420  train_R^2=0.2957  val_R^2=0.2607  best_val_R^2=0.2607
+      [2-step MLP] epoch  30/80  train_mse=41.5750  train_R^2=0.3077  val_R^2=0.2579  best_val_R^2=0.2669
+      [2-step MLP] epoch  40/80  train_mse=40.6920  train_R^2=0.3213  val_R^2=0.2629  best_val_R^2=0.2696
+      [2-step MLP] epoch  50/80  train_mse=40.0524  train_R^2=0.3390  val_R^2=0.2734  best_val_R^2=0.2734
+      [2-step MLP] epoch  60/80  train_mse=39.3085  train_R^2=0.3454  val_R^2=0.2598  best_val_R^2=0.2771
+      [2-step MLP] early stopping at epoch 65 (no improvement for 10 epochs)
+    train R^2 = 0.3423    val R^2 = 0.2771
+
+==============================================================================
+Summary  (LunarLander)
+==============================================================================
+  1-step Linear  val R^2 = 0.0248
+  1-step MLP     val R^2 = 0.2365
+  2-step Linear  val R^2 = 0.0536
+  2-step MLP     val R^2 = 0.2771
+  delta(2-step - 1-step) MLP = +0.0406   (positive = history adds info)
+  -> Reward is partially observable from (o, a); history barely helps.
+==============================================================================

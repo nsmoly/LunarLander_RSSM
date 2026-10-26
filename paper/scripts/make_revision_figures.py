@@ -15,7 +15,7 @@ Reads logs from this repository's logs/ folder and from the rof-reproduction rep
 (https://github.com/jonstraveladventures/rof-reproduction), which is expected
 to be cloned next to LunarLander_RSSM.
 
-    python paper/make_revision_figures.py
+    python paper/scripts/make_revision_figures.py
 """
 
 import glob
@@ -28,7 +28,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-PAPER = Path(__file__).resolve().parent
+PAPER = Path(__file__).resolve().parents[1]
 ROOT = PAPER.parent
 LOGS = ROOT / "logs"
 REPRO = ROOT.parent / "rof-reproduction"

@@ -1,0 +1,69 @@
+==============================================================================
+LunarLander Reward-Predictability Test (L1)  --  2026-10-25 15:19:51
+==============================================================================
+train_dataset = lunarlander_train_dataset.npz
+val_dataset   = lunarlander_val_dataset.npz
+device        = cuda
+hidden        = 256, depth = 2
+epochs        = 80, batch_size = 2048, lr = 0.001
+filter_terminals = True
+use_next_obs     = True
+
+[FILTER] Dropping terminal transitions (dones==1)...
+  train: removing 747 terminal transitions out of 158685
+  val:   removing 121 terminal transitions out of 22231
+  train terminal reward stats: mean=-15.9254  std=98.5881  min=-100.0000  max=100.0000
+  kept: train=157938, val=22110
+
+Dataset sizes:
+  train: N=157938, obs_dim=8, action_onehot_dim=4 (#classes=4)
+  val  : N=22110
+  train 2-step valid: 157188 / 157938
+  val   2-step valid: 21988 / 22110
+  reward stats (train): mean=-0.1059  std=3.5038  min=-38.6851  max=123.7079
+  reward stats (val)  : mean=-0.1612  std=3.5894  min=-34.7967  max=110.8778
+
+------------------------------------------------------------------------------
+1-step+next regressor   r_t = f(o_t, a_t, o_{t+1})   inputs: 20-D = obs(8) + act_onehot(4) + next_obs(8)
+------------------------------------------------------------------------------
+  Linear baseline:
+    train R^2 = 0.5119    val R^2 = 0.5479
+  MLP regressor:
+      [1-step MLP] epoch   1/80  train_mse=6.5150  train_R^2=0.7068  val_R^2=0.7241  best_val_R^2=0.7241
+      [1-step MLP] epoch  10/80  train_mse=1.1252  train_R^2=0.9144  val_R^2=0.9147  best_val_R^2=0.9147
+      [1-step MLP] epoch  20/80  train_mse=0.7279  train_R^2=0.9431  val_R^2=0.9381  best_val_R^2=0.9381
+      [1-step MLP] epoch  30/80  train_mse=0.5821  train_R^2=0.9513  val_R^2=0.9433  best_val_R^2=0.9472
+      [1-step MLP] epoch  40/80  train_mse=0.4765  train_R^2=0.9626  val_R^2=0.9569  best_val_R^2=0.9569
+      [1-step MLP] epoch  50/80  train_mse=0.4032  train_R^2=0.9674  val_R^2=0.9614  best_val_R^2=0.9626
+      [1-step MLP] epoch  60/80  train_mse=0.3125  train_R^2=0.9735  val_R^2=0.9671  best_val_R^2=0.9697
+      [1-step MLP] epoch  70/80  train_mse=0.2588  train_R^2=0.9820  val_R^2=0.9759  best_val_R^2=0.9759
+      [1-step MLP] epoch  80/80  train_mse=0.1983  train_R^2=0.9781  val_R^2=0.9754  best_val_R^2=0.9786
+    train R^2 = 0.9837    val R^2 = 0.9786
+
+------------------------------------------------------------------------------
+2-step+next regressor   r_t = f(o_{t-1}, o_t, a_t, o_{t+1})   inputs: 28-D = prev(8) + obs(8) + act(4) + next_obs(8)
+------------------------------------------------------------------------------
+  Linear baseline:
+    train R^2 = 0.5178    val R^2 = 0.5598
+  MLP regressor:
+      [2-step MLP] epoch   1/80  train_mse=6.4233  train_R^2=0.6981  val_R^2=0.7188  best_val_R^2=0.7188
+      [2-step MLP] epoch  10/80  train_mse=1.0964  train_R^2=0.9110  val_R^2=0.9150  best_val_R^2=0.9178
+      [2-step MLP] epoch  20/80  train_mse=0.7007  train_R^2=0.9430  val_R^2=0.9424  best_val_R^2=0.9443
+      [2-step MLP] epoch  30/80  train_mse=0.5424  train_R^2=0.9557  val_R^2=0.9518  best_val_R^2=0.9529
+      [2-step MLP] epoch  40/80  train_mse=0.4315  train_R^2=0.9678  val_R^2=0.9622  best_val_R^2=0.9625
+      [2-step MLP] epoch  50/80  train_mse=0.3471  train_R^2=0.9723  val_R^2=0.9668  best_val_R^2=0.9668
+      [2-step MLP] epoch  60/80  train_mse=0.2864  train_R^2=0.9754  val_R^2=0.9679  best_val_R^2=0.9710
+      [2-step MLP] epoch  70/80  train_mse=0.2482  train_R^2=0.9792  val_R^2=0.9712  best_val_R^2=0.9745
+      [2-step MLP] epoch  80/80  train_mse=0.1967  train_R^2=0.9843  val_R^2=0.9773  best_val_R^2=0.9773
+    train R^2 = 0.9843    val R^2 = 0.9773
+
+==============================================================================
+Summary  (LunarLander)
+==============================================================================
+  1-step Linear  val R^2 = 0.5479
+  1-step MLP     val R^2 = 0.9786
+  2-step Linear  val R^2 = 0.5598
+  2-step MLP     val R^2 = 0.9773
+  delta(2-step - 1-step) MLP = -0.0013   (positive = history adds info)
+  -> Reward is essentially Markovian in (o, a).  Latent history adds nothing.
+==============================================================================

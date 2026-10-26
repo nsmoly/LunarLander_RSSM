@@ -17,7 +17,7 @@ archive/**
 paper/*
 !paper/main.tex
 !paper/references.bib
-!paper/make_revision_figures.py
+!paper/scripts/
 !paper/figures/
 paper/figures/*
 !paper/figures/moonlander_mpc_1.jpg
@@ -28,3 +28,4 @@ reacher_rssm/
 reacher_rssm/**
 *_logs*.txt
 !logs/*.txt
+!logs/paper_sources/**

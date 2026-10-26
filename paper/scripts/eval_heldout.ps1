@@ -9,9 +9,9 @@
 # the 5090 laptop (about 3.5 h for all six policies); BC and A2C take minutes.
 #
 # Usage (from any folder):
-#   powershell -ExecutionPolicy Bypass -File eval_scripts\eval_heldout.ps1
-#   powershell -ExecutionPolicy Bypass -File eval_scripts\eval_heldout.ps1 -Policies a2c_wm310_ep1000,mpc_12345-3080-R_wm310
-#   powershell -ExecutionPolicy Bypass -File eval_scripts\eval_heldout.ps1 -SkipSanity
+#   powershell -ExecutionPolicy Bypass -File paper\scripts\eval_heldout.ps1
+#   powershell -ExecutionPolicy Bypass -File paper\scripts\eval_heldout.ps1 -Policies a2c_wm310_ep1000,mpc_12345-3080-R_wm310
+#   powershell -ExecutionPolicy Bypass -File paper\scripts\eval_heldout.ps1 -SkipSanity
 
 param(
     [string[]]$Policies = @(),
@@ -19,7 +19,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-Set-Location (Split-Path $PSScriptRoot -Parent)
+Set-Location (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent)
 
 $BC     = "eval_checkpoints\actor_bc.pt"
 $WM280  = "wm_checkpoints\world_model_20260331_085848_epoch_280.pt"
@@ -43,7 +43,7 @@ $selected = if ($want.Count) { @($table | Where-Object { $want -contains $_.Key 
 $unknown = @($want | Where-Object { $_ -notin $table.Key })
 if ($unknown.Count) { throw "Unknown policy: $($unknown -join ', '). Known: $($table.Key -join ', ')" }
 
-foreach ($f in @($BC, $WM280, $WM310, $WM777A, $AC310, "test_policy.py", "wm_mpc_policy.py", "eval_scripts\summarize_heldout.py")) {
+foreach ($f in @($BC, $WM280, $WM310, $WM777A, $AC310, "test_policy.py", "wm_mpc_policy.py", "paper\scripts\summarize_heldout.py")) {
     if (-not (Test-Path $f)) { throw "Missing: $f" }
 }
 
@@ -81,4 +81,4 @@ foreach ($r in $runs) {
 }
 
 Write-Host ("`nAll runs done in {0:N1} min. Summary (latest log of each policy):" -f ((Get-Date) - $started).TotalMinutes) -ForegroundColor Green
-& python eval_scripts\summarize_heldout.py
+& python paper\scripts\summarize_heldout.py

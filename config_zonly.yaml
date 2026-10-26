@@ -1,0 +1,70 @@
+# ===========================================================================
+# MoonLander RSSM — Dreamer-style World Models for LunarLander Policy Training
+#
+# Copyright (c) 2026 Nikolai Smolyanskiy
+# Licensed under the MIT License. See LICENSE file for details.
+# ===========================================================================
+
+# z-only reward head ablation. Identical to config.yaml apart from
+# world_model.reward_head_input, so any difference against the
+# checkpoints_seed12345continuous control is attributable to the reward head.
+world_model:
+  action_dim: 4
+  reward_head_input: z   # 'hz' (default) reads [h, z]; 'z' drops h entirely
+  capacity:
+    latent_dim: 16
+    hidden_dim: 256
+    mlp_hidden_dim: 256
+    gru_num_layers: 1  # Number of stacked GRU layers in RSSM
+  loss_weights:
+    reconstruction: 1.0
+    reward: 1.2
+    kl: 1.0
+    done: 0.5
+  epochs: 500
+  val_freq: 5
+  lr: 0.0001
+  beta_kl: 0.5
+  batch_size: 64
+  sequence_length: 30
+  dataset_seq_offset: 5
+  checkpoint_freq: 5  # Save checkpoint every N epochs
+  obs_structure:
+    physics_dim: 6    # Continuous physics dims (x, y, vx, vy, angle, ang_vel)
+    contact_dim: 2    # Binary contact dims (left leg, right leg)
+
+metrics:
+  warmup_steps: 5       # Posterior warmup steps before open-loop rollout
+  planning_horizon: 25  # Open-loop rollout horizon (should match CEM --horizon)
+
+actor_critic:
+  action_dim: 4
+  sequence_length: 5
+  dataset_seq_offset: 5   # Stride between start positions to reduce overlap
+  warmup_steps: 5         # Real observation/action steps to condition RSSM
+  imagination_steps: 15   # Latent rollout steps after warmup
+  gamma: 0.99         # Discount factor for GAE returns
+  lambda_gae: 0.95   # GAE lambda: 0=1-step TD, 1=full returns, 0.95=typical hybrid
+  capacity:
+    latent_dim: 16
+    hidden_dim: 256
+    mlp_hidden_dim: 256
+    gru_num_layers: 1  # Must match world_model capacity for loading world_model.pt
+  loss_weights:
+    actor: 1.0
+    critic: 0.3
+    entropy: 0.5   # Entropy start (early exploration)
+    entropy_final: 0.15   # Lower floor so entropy can settle naturally
+  advantage_clip: 0.9
+  actor_grad_clip: 1.8
+  critic_grad_clip: 100.0
+  collapse_entropy_threshold: 0.10   # Only stop if entropy is truly collapsed
+  collapse_actor_grad_threshold: 0.002  # Stop if actor gradients fade
+  collapse_max_action_prob_threshold: 0.96  # Detect near-single-action policy
+  collapse_patience_epochs: 5  # More room to recover before stopping
+  low_entropy_actor_lr_threshold: 0.25  # Only reduce LR when entropy is genuinely low
+  reduced_actor_lr: 0.000005  # One-way LR drop before full collapse
+  epochs: 1000
+  lr: 0.00003   # Higher starting LR for fresh training
+  batch_size: 256
+  checkpoint_freq: 50  # Save checkpoint every 50 epochs

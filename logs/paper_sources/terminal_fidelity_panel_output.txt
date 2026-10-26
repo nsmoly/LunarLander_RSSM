@@ -1,0 +1,129 @@
+
+MPC reference (epochs > 50): MA-7 peak, final-10 raw mean, drawdown
+  V7 12345 cont (3080)       collapse     peak   +99.0  final-10   -31.9  drawdown  130.9
+  12345 resume@300 (3080)    collapse     peak  +153.0  final-10   +61.7  drawdown   91.3
+  z-only 12345 (3080)        collapse     peak  +107.7  final-10   +15.1  drawdown   92.7
+  12345 reset@300 (5090)     degraded     peak  +154.8  final-10  +131.0  drawdown   23.7
+  z-only 12345 (5090)        dip+rebound  peak  +143.0  final-10  +124.1  drawdown   18.9
+  12345 cont (5090)          healthy      peak  +168.0  final-10  +157.6  drawdown   10.4
+  777 cont (3080)            healthy      peak  +186.2  final-10  +174.1  drawdown   12.1
+  777 reset@300              healthy      peak  +174.6  final-10  +154.6  drawdown   20.0
+
+=== crash.pred_T  (H=25, MA-7 over checkpoints) ===
+  run                        outcome          early      late  late-early  rho(MPC)
+  V7 12345 cont (3080)       collapse        -5.682    -3.256      +2.426     -0.33
+  12345 resume@300 (3080)    collapse        -5.665    -3.455      +2.210     -0.01
+  z-only 12345 (3080)        collapse        -8.847    -4.427      +4.420     +0.36
+  12345 reset@300 (5090)     degraded        -6.131    -4.295      +1.836     +0.39
+  z-only 12345 (5090)        dip+rebound     -9.363    -5.146      +4.218     +0.75
+  12345 cont (5090)          healthy         -6.131    -3.927      +2.204     +0.62
+  777 cont (3080)            healthy         -9.199    -3.799      +5.400     +0.43
+  777 reset@300              healthy         -9.199    -4.023      +5.176     +0.06
+  across runs (n=8): rho(late-early, MPC drawdown) = -0.10   rho(late, MPC final-10) = -0.07
+
+=== crash.extreme3  (H=25, MA-7 over checkpoints) ===
+  run                        outcome          early      late  late-early  rho(MPC)
+  V7 12345 cont (3080)       collapse        -8.007    -7.126      +0.881     -0.07
+  12345 resume@300 (3080)    collapse        -7.629    -9.287      -1.658     +0.10
+  z-only 12345 (3080)        collapse       -10.678    -6.952      +3.726     +0.37
+  12345 reset@300 (5090)     degraded        -8.072    -9.573      -1.501     +0.05
+  z-only 12345 (5090)        dip+rebound    -11.069    -7.721      +3.349     +0.81
+  12345 cont (5090)          healthy         -8.072    -8.504      -0.432     -0.24
+  777 cont (3080)            healthy        -10.384    -8.202      +2.182     +0.30
+  777 reset@300              healthy        -10.384    -8.257      +2.127     -0.08
+  across runs (n=8): rho(late-early, MPC drawdown) = -0.05   rho(late, MPC final-10) = -0.45
+
+=== crash.hit3  (H=25, MA-7 over checkpoints) ===
+  run                        outcome          early      late  late-early  rho(MPC)
+  V7 12345 cont (3080)       collapse        +0.044    +0.041      -0.003     -0.02
+  12345 resume@300 (3080)    collapse        +0.040    +0.057      +0.018     -0.18
+  z-only 12345 (3080)        collapse        +0.072    +0.031      -0.041     -0.36
+  12345 reset@300 (5090)     degraded        +0.045    +0.059      +0.014     +0.08
+  z-only 12345 (5090)        dip+rebound     +0.074    +0.034      -0.040     -0.83
+  12345 cont (5090)          healthy         +0.045    +0.047      +0.002     +0.19
+  777 cont (3080)            healthy         +0.071    +0.039      -0.032     -0.28
+  777 reset@300              healthy         +0.071    +0.041      -0.030     +0.02
+  across runs (n=8): rho(late-early, MPC drawdown) = +0.05   rho(late, MPC final-10) = +0.10
+
+=== crash.done_max3  (H=25, MA-7 over checkpoints) ===
+  run                        outcome          early      late  late-early  rho(MPC)
+  V7 12345 cont (3080)       collapse        +0.049    +0.047      -0.002     -0.10
+  12345 resume@300 (3080)    collapse        +0.039    +0.060      +0.021     -0.19
+  z-only 12345 (3080)        collapse        +0.064    +0.026      -0.039     -0.31
+  12345 reset@300 (5090)     degraded        +0.044    +0.086      +0.042     +0.16
+  z-only 12345 (5090)        dip+rebound     +0.076    +0.041      -0.034     -0.80
+  12345 cont (5090)          healthy         +0.044    +0.070      +0.026     +0.61
+  777 cont (3080)            healthy         +0.077    +0.058      -0.019     -0.27
+  777 reset@300              healthy         +0.077    +0.051      -0.026     +0.17
+  across runs (n=8): rho(late-early, MPC drawdown) = -0.14   rho(late, MPC final-10) = +0.52
+
+=== crash.cum_err  (H=25, MA-7 over checkpoints) ===
+  run                        outcome          early      late  late-early  rho(MPC)
+  V7 12345 cont (3080)       collapse       +83.711   +93.165      +9.455     -0.36
+  12345 resume@300 (3080)    collapse       +82.006   +85.061      +3.055     -0.06
+  z-only 12345 (3080)        collapse       +58.924   +82.638     +23.714     +0.34
+  12345 reset@300 (5090)     degraded       +81.431   +79.096      -2.335     +0.47
+  z-only 12345 (5090)        dip+rebound    +57.489   +77.010     +19.521     +0.70
+  12345 cont (5090)          healthy        +81.431   +84.347      +2.916     +0.18
+  777 cont (3080)            healthy        +71.511   +80.117      +8.606     +0.18
+  777 reset@300              healthy        +71.511   +80.861      +9.350     -0.16
+  across runs (n=8): rho(late-early, MPC drawdown) = +0.38   rho(late, MPC final-10) = -0.45
+
+=== land.extreme3  (H=25, MA-7 over checkpoints) ===
+  run                        outcome          early      late  late-early  rho(MPC)
+  V7 12345 cont (3080)       collapse       +60.053   +61.790      +1.737     +0.00
+  12345 resume@300 (3080)    collapse       +60.123   +68.122      +8.000     +0.34
+  z-only 12345 (3080)        collapse       +50.143   +67.735     +17.592     +0.43
+  12345 reset@300 (5090)     degraded       +53.905   +69.951     +16.046     +0.53
+  z-only 12345 (5090)        dip+rebound    +47.674   +67.905     +20.232     +0.68
+  12345 cont (5090)          healthy        +53.905   +70.377     +16.472     +0.76
+  777 cont (3080)            healthy        +59.500   +69.803     +10.303     +0.10
+  777 reset@300              healthy        +59.500   +71.391     +11.891     -0.11
+  across runs (n=8): rho(late-early, MPC drawdown) = -0.38   rho(late, MPC final-10) = +0.81
+
+=== land.hit3  (H=25, MA-7 over checkpoints) ===
+  run                        outcome          early      late  late-early  rho(MPC)
+  V7 12345 cont (3080)       collapse        +0.659    +0.627      -0.031     +0.19
+  12345 resume@300 (3080)    collapse        +0.662    +0.687      +0.025     +0.44
+  z-only 12345 (3080)        collapse        +0.533    +0.681      +0.148     +0.45
+  12345 reset@300 (5090)     degraded        +0.597    +0.713      +0.116     +0.52
+  z-only 12345 (5090)        dip+rebound     +0.521    +0.685      +0.163     +0.61
+  12345 cont (5090)          healthy         +0.597    +0.713      +0.116     +0.74
+  777 cont (3080)            healthy         +0.639    +0.701      +0.062     +0.03
+  777 reset@300              healthy         +0.639    +0.727      +0.088     -0.14
+  across runs (n=8): rho(late-early, MPC drawdown) = -0.38   rho(late, MPC final-10) = +0.81
+
+=== land.cum_err  (H=25, MA-7 over checkpoints) ===
+  run                        outcome          early      late  late-early  rho(MPC)
+  V7 12345 cont (3080)       collapse       +14.004    -6.069     -20.073     +0.46
+  12345 resume@300 (3080)    collapse       +21.039   +10.681     -10.358     -0.08
+  z-only 12345 (3080)        collapse       +14.333   +16.714      +2.382     -0.44
+  12345 reset@300 (5090)     degraded       +13.052    +7.615      -5.437     -0.56
+  z-only 12345 (5090)        dip+rebound    +12.558    +8.119      -4.439     -0.28
+  12345 cont (5090)          healthy        +13.052    +5.888      -7.164     -0.49
+  777 cont (3080)            healthy        +17.717   +21.691      +3.974     -0.11
+  777 reset@300              healthy        +17.717   +32.835     +15.118     -0.15
+  across runs (n=8): rho(late-early, MPC drawdown) = -0.38   rho(late, MPC final-10) = +0.36
+
+=== bulk.cum_err  (H=25, MA-7 over checkpoints) ===
+  run                        outcome          early      late  late-early  rho(MPC)
+  V7 12345 cont (3080)       collapse        +0.323    -0.132      -0.455     +0.31
+  12345 resume@300 (3080)    collapse        -0.252    -0.673      -0.422     +0.31
+  z-only 12345 (3080)        collapse        -0.567    -1.468      -0.902     -0.29
+  12345 reset@300 (5090)     degraded        +0.586    -0.500      -1.086     +0.02
+  z-only 12345 (5090)        dip+rebound     -1.308    -1.484      -0.176     -0.53
+  12345 cont (5090)          healthy         +0.586    -0.037      -0.622     -0.27
+  777 cont (3080)            healthy         +0.075    -1.230      -1.305     -0.68
+  777 reset@300              healthy         +0.075    -0.875      -0.950     -0.50
+  across runs (n=8): rho(late-early, MPC drawdown) = +0.21   rho(late, MPC final-10) = +0.05
+
+Summary across runs (n = 8; |rho| > 0.74 needed for p < 0.05 at n = 8)
+  crash.pred_T       change vs drawdown -0.10   late vs final-10 -0.07
+  crash.extreme3     change vs drawdown -0.05   late vs final-10 -0.45
+  crash.hit3         change vs drawdown +0.05   late vs final-10 +0.10
+  crash.done_max3    change vs drawdown -0.14   late vs final-10 +0.52
+  crash.cum_err      change vs drawdown +0.38   late vs final-10 -0.45
+  land.extreme3      change vs drawdown -0.38   late vs final-10 +0.81
+  land.hit3          change vs drawdown -0.38   late vs final-10 +0.81
+  land.cum_err       change vs drawdown -0.38   late vs final-10 +0.36
+  bulk.cum_err       change vs drawdown +0.21   late vs final-10 +0.05

@@ -9,15 +9,16 @@
 # episode seeds 100000-100099) with the paper's caps.
 # Step 2 adds WM-AC at the common 1000-step cap, for the footnote only.
 #
-# Usage (from the repo root):  powershell -ExecutionPolicy Bypass -File eval_nseeds.ps1
+# Usage (from the repo root):  powershell -ExecutionPolicy Bypass -File paper\scripts\eval_nseeds.ps1
 
 $ErrorActionPreference = "Stop"
-Set-Location $PSScriptRoot
+Set-Location (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent)
 
-$A    = "archive\V4_goodBest_landing_extendedTrainingBest_04022026"
-$WM   = "$A\checkpoints_worldmodel\world_model_20260331_085848_epoch_280.pt"
-$WMAC = "$A\checkpoints_actorcritic_wms\checkpoints_actorcritic_wm280\actor_20260503_031907_epoch_800.pt"
-$MFAC = "$A\checkpoints_actorcritic_modelfree\actor_mf_20260324_231147_epoch_760.pt"
+# Byte-identical copies of world_model_20260331_085848_epoch_280.pt,
+# actor_20260503_031907_epoch_800.pt and actor_mf_20260324_231147_epoch_760.pt.
+$WM   = "world_model.pt"
+$WMAC = "actor.pt"
+$MFAC = "actor_mf.pt"
 $OUT  = "logs\eval_nseeds"
 $TS   = Get-Date -Format "yyyyMMdd_HHmmss"
 $EPISODES = 100

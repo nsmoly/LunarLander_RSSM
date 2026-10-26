@@ -34,10 +34,10 @@ made from; the repository copies are byte-identical (same SHA-256).
 ## Files
 
 - `heldout_<session>_<policy>_seed<seed>_n<episodes>.txt`: per-episode logs
-  from `eval_scripts/eval_heldout.ps1`. Session `20261014_143234` has BC and MPC
+  from `paper/scripts/eval_heldout.ps1`. Session `20261014_143234` has BC and MPC
   on WM 280 and `777-5090-A`; session `20261014_223629` has MPC and A2C on WM 310.
 - `SUMMARY.txt`: all policies together (sanity checks, held-out table, paired
-  bootstrap differences), from `eval_scripts/summarize_heldout.py`.
+  bootstrap differences), from `paper/scripts/summarize_heldout.py`.
 - `sel3080_20260507_121538_mpc_12345-3080-R_wm310_seed12345_n100.txt`: the
   original RTX 3080 run (torch 1.12.1, Python 3.9.13) behind the paper's MPC
   selection score of +166.60: WM 310, 100 episodes, seed 12345, 600-step cap.
@@ -74,14 +74,14 @@ with torch 1.12, and CEM-MPC returns do not replay across the two machines.
 On an interactive desktop (MPC opens a pygame window):
 
 ```
-powershell -ExecutionPolicy Bypass -File eval_scripts\eval_heldout.ps1
-powershell -ExecutionPolicy Bypass -File eval_scripts\eval_heldout.ps1 -Policies a2c_wm310_ep1000,mpc_12345-3080-R_wm310
-powershell -ExecutionPolicy Bypass -File eval_scripts\eval_heldout.ps1 -SkipSanity
+powershell -ExecutionPolicy Bypass -File paper\scripts\eval_heldout.ps1
+powershell -ExecutionPolicy Bypass -File paper\scripts\eval_heldout.ps1 -Policies a2c_wm310_ep1000,mpc_12345-3080-R_wm310
+powershell -ExecutionPolicy Bypass -File paper\scripts\eval_heldout.ps1 -SkipSanity
 ```
 
 Policies: `bc_argmax`, `bc_sampled`, `mpc_12345-3080-R_wm280`,
 `mpc_12345-3080-R_wm310`, `mpc_777-5090-A_ep500`, `a2c_wm310_ep1000` (default:
 all). `-SkipSanity` skips the seed-12345 replays. All six take about 3.5 h on
 the 5090, almost all of it MPC. The script ends by running
-`python eval_scripts/summarize_heldout.py`, which summarises the latest log of
+`python paper/scripts/summarize_heldout.py`, which summarises the latest log of
 each policy into `SUMMARY.txt` (`--ts <session> ...` pins specific sessions).

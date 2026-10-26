@@ -1,0 +1,909 @@
+Train dataset file: lunarlander_train_dataset.npz
+Validation dataset file: lunarlander_val_dataset.npz
+Train dataset episodes: 750
+Train dataset samples/sequences: 32038
+Validation dataset episodes: 122
+Validation dataset samples/sequences: 4500
+Training world model for 500 epochs with lr=0.0001, beta_kl=0.5, sequence_length=30, dataset_seq_offset=5, seed=12345...
+Model capacity: latent_dim=16, hidden_dim=256, mlp_hidden_dim=256, gru_num_layers=1, reward_head_input=z (in_features=16)
+Loss weights: recon=1.0, reward=1.2, kl=1.0, done=0.5
+[WorldModel] Epoch 1, train_loss=66.3658
+[WorldModel] Epoch 2, train_loss=59.5919
+[WorldModel] Epoch 3, train_loss=54.8547
+[WorldModel] Epoch 4, train_loss=51.7116
+[WorldModel] Epoch 5, train_loss=49.3043, val_loss=53.9058
+  Validation Metrics - Obs MAE: 0.0760, Obs RMSE: 0.1340
+  Reward MAE: 1.6396, Reward RMSE: 6.6313, Reward Sign Acc: 0.857
+  Done Acc: 0.995
+Saved checkpoint: checkpoints\world_model_20260825_230516_epoch_5.pt
+[WorldModel] Epoch 6, train_loss=45.0440
+[WorldModel] Epoch 7, train_loss=42.6686
+[WorldModel] Epoch 8, train_loss=39.2996
+[WorldModel] Epoch 9, train_loss=38.5863
+[WorldModel] Epoch 10, train_loss=36.3274, val_loss=44.0163
+  Validation Metrics - Obs MAE: 0.0661, Obs RMSE: 0.1136
+  Reward MAE: 1.7242, Reward RMSE: 5.9817, Reward Sign Acc: 0.851
+  Done Acc: 0.996
+Saved checkpoint: checkpoints\world_model_20260825_231042_epoch_10.pt
+[WorldModel] Epoch 11, train_loss=34.8145
+[WorldModel] Epoch 12, train_loss=34.9563
+[WorldModel] Epoch 13, train_loss=33.8938
+[WorldModel] Epoch 14, train_loss=33.0988
+[WorldModel] Epoch 15, train_loss=31.9312, val_loss=40.0889
+  Validation Metrics - Obs MAE: 0.0594, Obs RMSE: 0.1064
+  Reward MAE: 1.5152, Reward RMSE: 5.7048, Reward Sign Acc: 0.865
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260825_231610_epoch_15.pt
+[WorldModel] Epoch 16, train_loss=32.0321
+[WorldModel] Epoch 17, train_loss=32.1408
+[WorldModel] Epoch 18, train_loss=31.8887
+[WorldModel] Epoch 19, train_loss=31.9141
+[WorldModel] Epoch 20, train_loss=32.0417, val_loss=39.1857
+  Validation Metrics - Obs MAE: 0.0550, Obs RMSE: 0.0982
+  Reward MAE: 1.3492, Reward RMSE: 5.6432, Reward Sign Acc: 0.865
+  Done Acc: 0.996
+Saved checkpoint: checkpoints\world_model_20260825_232138_epoch_20.pt
+[WorldModel] Epoch 21, train_loss=31.8156
+[WorldModel] Epoch 22, train_loss=30.8024
+[WorldModel] Epoch 23, train_loss=32.2631
+[WorldModel] Epoch 24, train_loss=31.0283
+[WorldModel] Epoch 25, train_loss=32.4210, val_loss=41.8605
+  Validation Metrics - Obs MAE: 0.0520, Obs RMSE: 0.0947
+  Reward MAE: 1.3327, Reward RMSE: 5.8323, Reward Sign Acc: 0.864
+  Done Acc: 0.996
+Saved checkpoint: checkpoints\world_model_20260825_232706_epoch_25.pt
+[WorldModel] Epoch 26, train_loss=30.6915
+[WorldModel] Epoch 27, train_loss=31.0498
+[WorldModel] Epoch 28, train_loss=31.4384
+[WorldModel] Epoch 29, train_loss=31.2696
+[WorldModel] Epoch 30, train_loss=31.0324, val_loss=41.0521
+  Validation Metrics - Obs MAE: 0.0483, Obs RMSE: 0.0897
+  Reward MAE: 1.4310, Reward RMSE: 5.7773, Reward Sign Acc: 0.882
+  Done Acc: 0.996
+Saved checkpoint: checkpoints\world_model_20260825_233234_epoch_30.pt
+[WorldModel] Epoch 31, train_loss=31.1048
+[WorldModel] Epoch 32, train_loss=29.6308
+[WorldModel] Epoch 33, train_loss=29.6864
+[WorldModel] Epoch 34, train_loss=30.3436
+[WorldModel] Epoch 35, train_loss=30.3909, val_loss=42.4619
+  Validation Metrics - Obs MAE: 0.0490, Obs RMSE: 0.0859
+  Reward MAE: 1.3178, Reward RMSE: 5.8802, Reward Sign Acc: 0.881
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260825_233802_epoch_35.pt
+[WorldModel] Epoch 36, train_loss=29.9565
+[WorldModel] Epoch 37, train_loss=29.4740
+[WorldModel] Epoch 38, train_loss=28.6213
+[WorldModel] Epoch 39, train_loss=29.3007
+[WorldModel] Epoch 40, train_loss=28.3996, val_loss=39.7975
+  Validation Metrics - Obs MAE: 0.0434, Obs RMSE: 0.0787
+  Reward MAE: 1.2595, Reward RMSE: 5.6880, Reward Sign Acc: 0.883
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260825_234329_epoch_40.pt
+[WorldModel] Epoch 41, train_loss=29.1601
+[WorldModel] Epoch 42, train_loss=30.4376
+[WorldModel] Epoch 43, train_loss=28.7741
+[WorldModel] Epoch 44, train_loss=28.9338
+[WorldModel] Epoch 45, train_loss=29.2940, val_loss=37.5903
+  Validation Metrics - Obs MAE: 0.0431, Obs RMSE: 0.0777
+  Reward MAE: 1.1940, Reward RMSE: 5.5262, Reward Sign Acc: 0.883
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260825_234858_epoch_45.pt
+[WorldModel] Epoch 46, train_loss=28.8611
+[WorldModel] Epoch 47, train_loss=28.6131
+[WorldModel] Epoch 48, train_loss=27.9923
+[WorldModel] Epoch 49, train_loss=29.3346
+[WorldModel] Epoch 50, train_loss=28.7046, val_loss=45.0552
+  Validation Metrics - Obs MAE: 0.0448, Obs RMSE: 0.0810
+  Reward MAE: 1.2955, Reward RMSE: 6.0562, Reward Sign Acc: 0.889
+  Done Acc: 0.996
+Saved checkpoint: checkpoints\world_model_20260825_235426_epoch_50.pt
+[WorldModel] Epoch 51, train_loss=28.5929
+[WorldModel] Epoch 52, train_loss=28.3260
+[WorldModel] Epoch 53, train_loss=29.1898
+[WorldModel] Epoch 54, train_loss=28.9200
+[WorldModel] Epoch 55, train_loss=27.8695, val_loss=39.9468
+  Validation Metrics - Obs MAE: 0.0420, Obs RMSE: 0.0772
+  Reward MAE: 1.4220, Reward RMSE: 5.6965, Reward Sign Acc: 0.860
+  Done Acc: 0.996
+Saved checkpoint: checkpoints\world_model_20260825_235955_epoch_55.pt
+[WorldModel] Epoch 56, train_loss=27.5004
+[WorldModel] Epoch 57, train_loss=27.9759
+[WorldModel] Epoch 58, train_loss=27.7392
+[WorldModel] Epoch 59, train_loss=27.2363
+[WorldModel] Epoch 60, train_loss=28.1533, val_loss=40.5090
+  Validation Metrics - Obs MAE: 0.0428, Obs RMSE: 0.0774
+  Reward MAE: 1.1747, Reward RMSE: 5.7366, Reward Sign Acc: 0.892
+  Done Acc: 0.996
+Saved checkpoint: checkpoints\world_model_20260826_000522_epoch_60.pt
+[WorldModel] Epoch 61, train_loss=28.3339
+[WorldModel] Epoch 62, train_loss=28.1827
+[WorldModel] Epoch 63, train_loss=28.3314
+[WorldModel] Epoch 64, train_loss=27.0328
+[WorldModel] Epoch 65, train_loss=27.6679, val_loss=40.2619
+  Validation Metrics - Obs MAE: 0.0410, Obs RMSE: 0.0739
+  Reward MAE: 1.2476, Reward RMSE: 5.7139, Reward Sign Acc: 0.896
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_001049_epoch_65.pt
+[WorldModel] Epoch 66, train_loss=28.0944
+[WorldModel] Epoch 67, train_loss=27.6080
+[WorldModel] Epoch 68, train_loss=26.8028
+[WorldModel] Epoch 69, train_loss=27.1006
+[WorldModel] Epoch 70, train_loss=27.5396, val_loss=37.0084
+  Validation Metrics - Obs MAE: 0.0376, Obs RMSE: 0.0689
+  Reward MAE: 1.0575, Reward RMSE: 5.4801, Reward Sign Acc: 0.899
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_001617_epoch_70.pt
+[WorldModel] Epoch 71, train_loss=27.8799
+[WorldModel] Epoch 72, train_loss=27.5932
+[WorldModel] Epoch 73, train_loss=27.3616
+[WorldModel] Epoch 74, train_loss=27.6550
+[WorldModel] Epoch 75, train_loss=27.9904, val_loss=38.9007
+  Validation Metrics - Obs MAE: 0.0380, Obs RMSE: 0.0698
+  Reward MAE: 1.1572, Reward RMSE: 5.6210, Reward Sign Acc: 0.899
+  Done Acc: 0.996
+Saved checkpoint: checkpoints\world_model_20260826_002144_epoch_75.pt
+[WorldModel] Epoch 76, train_loss=28.2137
+[WorldModel] Epoch 77, train_loss=27.6069
+[WorldModel] Epoch 78, train_loss=27.7358
+[WorldModel] Epoch 79, train_loss=28.3471
+[WorldModel] Epoch 80, train_loss=27.0948, val_loss=38.4356
+  Validation Metrics - Obs MAE: 0.0372, Obs RMSE: 0.0668
+  Reward MAE: 1.2030, Reward RMSE: 5.5820, Reward Sign Acc: 0.886
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_002712_epoch_80.pt
+[WorldModel] Epoch 81, train_loss=27.1965
+[WorldModel] Epoch 82, train_loss=26.9237
+[WorldModel] Epoch 83, train_loss=27.2320
+[WorldModel] Epoch 84, train_loss=27.8829
+[WorldModel] Epoch 85, train_loss=27.1431, val_loss=40.3214
+  Validation Metrics - Obs MAE: 0.0397, Obs RMSE: 0.0712
+  Reward MAE: 1.1384, Reward RMSE: 5.7176, Reward Sign Acc: 0.894
+  Done Acc: 0.996
+Saved checkpoint: checkpoints\world_model_20260826_003240_epoch_85.pt
+[WorldModel] Epoch 86, train_loss=25.5798
+[WorldModel] Epoch 87, train_loss=26.7392
+[WorldModel] Epoch 88, train_loss=26.4423
+[WorldModel] Epoch 89, train_loss=25.7184
+[WorldModel] Epoch 90, train_loss=26.5203, val_loss=39.6339
+  Validation Metrics - Obs MAE: 0.0358, Obs RMSE: 0.0678
+  Reward MAE: 1.1505, Reward RMSE: 5.6710, Reward Sign Acc: 0.902
+  Done Acc: 0.996
+Saved checkpoint: checkpoints\world_model_20260826_003807_epoch_90.pt
+[WorldModel] Epoch 91, train_loss=25.8344
+[WorldModel] Epoch 92, train_loss=25.3621
+[WorldModel] Epoch 93, train_loss=26.5501
+[WorldModel] Epoch 94, train_loss=27.0373
+[WorldModel] Epoch 95, train_loss=26.6574, val_loss=37.3197
+  Validation Metrics - Obs MAE: 0.0388, Obs RMSE: 0.0713
+  Reward MAE: 1.0869, Reward RMSE: 5.4939, Reward Sign Acc: 0.903
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_004336_epoch_95.pt
+[WorldModel] Epoch 96, train_loss=25.8632
+[WorldModel] Epoch 97, train_loss=26.4011
+[WorldModel] Epoch 98, train_loss=25.3770
+[WorldModel] Epoch 99, train_loss=25.1228
+[WorldModel] Epoch 100, train_loss=26.5786, val_loss=41.4333
+  Validation Metrics - Obs MAE: 0.0328, Obs RMSE: 0.0632
+  Reward MAE: 1.1061, Reward RMSE: 5.7998, Reward Sign Acc: 0.898
+  Done Acc: 0.996
+Saved checkpoint: checkpoints\world_model_20260826_004903_epoch_100.pt
+[WorldModel] Epoch 101, train_loss=24.8113
+[WorldModel] Epoch 102, train_loss=25.7086
+[WorldModel] Epoch 103, train_loss=25.2848
+[WorldModel] Epoch 104, train_loss=25.5379
+[WorldModel] Epoch 105, train_loss=25.1810, val_loss=39.6310
+  Validation Metrics - Obs MAE: 0.0354, Obs RMSE: 0.0671
+  Reward MAE: 1.1635, Reward RMSE: 5.6693, Reward Sign Acc: 0.897
+  Done Acc: 0.996
+Saved checkpoint: checkpoints\world_model_20260826_005431_epoch_105.pt
+[WorldModel] Epoch 106, train_loss=25.3928
+[WorldModel] Epoch 107, train_loss=25.1051
+[WorldModel] Epoch 108, train_loss=24.8600
+[WorldModel] Epoch 109, train_loss=25.1688
+[WorldModel] Epoch 110, train_loss=24.2490, val_loss=37.3976
+  Validation Metrics - Obs MAE: 0.0337, Obs RMSE: 0.0651
+  Reward MAE: 1.0911, Reward RMSE: 5.5006, Reward Sign Acc: 0.902
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_005958_epoch_110.pt
+[WorldModel] Epoch 111, train_loss=23.8632
+[WorldModel] Epoch 112, train_loss=24.9756
+[WorldModel] Epoch 113, train_loss=24.3774
+[WorldModel] Epoch 114, train_loss=24.6774
+[WorldModel] Epoch 115, train_loss=24.9022, val_loss=36.4349
+  Validation Metrics - Obs MAE: 0.0346, Obs RMSE: 0.0654
+  Reward MAE: 1.1000, Reward RMSE: 5.4272, Reward Sign Acc: 0.900
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_010526_epoch_115.pt
+[WorldModel] Epoch 116, train_loss=24.9118
+[WorldModel] Epoch 117, train_loss=25.1433
+[WorldModel] Epoch 118, train_loss=24.7270
+[WorldModel] Epoch 119, train_loss=23.1807
+[WorldModel] Epoch 120, train_loss=23.6336, val_loss=35.9480
+  Validation Metrics - Obs MAE: 0.0348, Obs RMSE: 0.0665
+  Reward MAE: 1.1105, Reward RMSE: 5.3912, Reward Sign Acc: 0.902
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_011054_epoch_120.pt
+[WorldModel] Epoch 121, train_loss=24.2482
+[WorldModel] Epoch 122, train_loss=24.5266
+[WorldModel] Epoch 123, train_loss=24.4899
+[WorldModel] Epoch 124, train_loss=23.0670
+[WorldModel] Epoch 125, train_loss=24.6885, val_loss=39.9135
+  Validation Metrics - Obs MAE: 0.0346, Obs RMSE: 0.0658
+  Reward MAE: 1.1564, Reward RMSE: 5.6846, Reward Sign Acc: 0.903
+  Done Acc: 0.996
+Saved checkpoint: checkpoints\world_model_20260826_011622_epoch_125.pt
+[WorldModel] Epoch 126, train_loss=25.2463
+[WorldModel] Epoch 127, train_loss=23.0303
+[WorldModel] Epoch 128, train_loss=22.5623
+[WorldModel] Epoch 129, train_loss=23.8978
+[WorldModel] Epoch 130, train_loss=23.2299, val_loss=38.7387
+  Validation Metrics - Obs MAE: 0.0319, Obs RMSE: 0.0603
+  Reward MAE: 1.0953, Reward RMSE: 5.5880, Reward Sign Acc: 0.899
+  Done Acc: 0.996
+Saved checkpoint: checkpoints\world_model_20260826_012149_epoch_130.pt
+[WorldModel] Epoch 131, train_loss=22.8701
+[WorldModel] Epoch 132, train_loss=23.7912
+[WorldModel] Epoch 133, train_loss=22.5824
+[WorldModel] Epoch 134, train_loss=22.3317
+[WorldModel] Epoch 135, train_loss=23.5457, val_loss=36.4981
+  Validation Metrics - Obs MAE: 0.0317, Obs RMSE: 0.0624
+  Reward MAE: 1.0846, Reward RMSE: 5.4323, Reward Sign Acc: 0.896
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_012717_epoch_135.pt
+[WorldModel] Epoch 136, train_loss=22.8684
+[WorldModel] Epoch 137, train_loss=22.6944
+[WorldModel] Epoch 138, train_loss=23.3837
+[WorldModel] Epoch 139, train_loss=22.2670
+[WorldModel] Epoch 140, train_loss=22.7385, val_loss=35.7025
+  Validation Metrics - Obs MAE: 0.0321, Obs RMSE: 0.0633
+  Reward MAE: 1.0500, Reward RMSE: 5.3693, Reward Sign Acc: 0.905
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_013245_epoch_140.pt
+[WorldModel] Epoch 141, train_loss=22.8203
+[WorldModel] Epoch 142, train_loss=22.6185
+[WorldModel] Epoch 143, train_loss=22.9582
+[WorldModel] Epoch 144, train_loss=21.7542
+[WorldModel] Epoch 145, train_loss=22.3516, val_loss=34.5076
+  Validation Metrics - Obs MAE: 0.0325, Obs RMSE: 0.0630
+  Reward MAE: 1.0187, Reward RMSE: 5.2766, Reward Sign Acc: 0.896
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_013812_epoch_145.pt
+[WorldModel] Epoch 146, train_loss=22.4634
+[WorldModel] Epoch 147, train_loss=22.1720
+[WorldModel] Epoch 148, train_loss=22.7517
+[WorldModel] Epoch 149, train_loss=22.5047
+[WorldModel] Epoch 150, train_loss=22.3256, val_loss=38.6842
+  Validation Metrics - Obs MAE: 0.0315, Obs RMSE: 0.0618
+  Reward MAE: 1.1092, Reward RMSE: 5.5974, Reward Sign Acc: 0.904
+  Done Acc: 0.996
+Saved checkpoint: checkpoints\world_model_20260826_014339_epoch_150.pt
+[WorldModel] Epoch 151, train_loss=21.9959
+[WorldModel] Epoch 152, train_loss=23.2152
+[WorldModel] Epoch 153, train_loss=22.8849
+[WorldModel] Epoch 154, train_loss=22.5863
+[WorldModel] Epoch 155, train_loss=21.9995, val_loss=36.6537
+  Validation Metrics - Obs MAE: 0.0302, Obs RMSE: 0.0600
+  Reward MAE: 1.0447, Reward RMSE: 5.4420, Reward Sign Acc: 0.905
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_015035_epoch_155.pt
+[WorldModel] Epoch 156, train_loss=22.7193
+[WorldModel] Epoch 157, train_loss=22.0703
+[WorldModel] Epoch 158, train_loss=21.8338
+[WorldModel] Epoch 159, train_loss=21.3754
+[WorldModel] Epoch 160, train_loss=22.2008, val_loss=35.2138
+  Validation Metrics - Obs MAE: 0.0308, Obs RMSE: 0.0608
+  Reward MAE: 1.0342, Reward RMSE: 5.3363, Reward Sign Acc: 0.898
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_015747_epoch_160.pt
+[WorldModel] Epoch 161, train_loss=22.1088
+[WorldModel] Epoch 162, train_loss=22.0135
+[WorldModel] Epoch 163, train_loss=22.1063
+[WorldModel] Epoch 164, train_loss=22.3433
+[WorldModel] Epoch 165, train_loss=22.1540, val_loss=38.4079
+  Validation Metrics - Obs MAE: 0.0343, Obs RMSE: 0.0647
+  Reward MAE: 1.0028, Reward RMSE: 5.5715, Reward Sign Acc: 0.907
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_020435_epoch_165.pt
+[WorldModel] Epoch 166, train_loss=23.2807
+[WorldModel] Epoch 167, train_loss=21.9151
+[WorldModel] Epoch 168, train_loss=22.0947
+[WorldModel] Epoch 169, train_loss=20.8431
+[WorldModel] Epoch 170, train_loss=22.3439, val_loss=35.2333
+  Validation Metrics - Obs MAE: 0.0298, Obs RMSE: 0.0604
+  Reward MAE: 1.0026, Reward RMSE: 5.3345, Reward Sign Acc: 0.903
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_021145_epoch_170.pt
+[WorldModel] Epoch 171, train_loss=21.8997
+[WorldModel] Epoch 172, train_loss=22.3818
+[WorldModel] Epoch 173, train_loss=21.7926
+[WorldModel] Epoch 174, train_loss=22.3131
+[WorldModel] Epoch 175, train_loss=22.0338, val_loss=37.3669
+  Validation Metrics - Obs MAE: 0.0300, Obs RMSE: 0.0605
+  Reward MAE: 1.0221, Reward RMSE: 5.4986, Reward Sign Acc: 0.902
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_021856_epoch_175.pt
+[WorldModel] Epoch 176, train_loss=20.7068
+[WorldModel] Epoch 177, train_loss=21.0235
+[WorldModel] Epoch 178, train_loss=21.1045
+[WorldModel] Epoch 179, train_loss=21.6976
+[WorldModel] Epoch 180, train_loss=20.8657, val_loss=33.8510
+  Validation Metrics - Obs MAE: 0.0292, Obs RMSE: 0.0588
+  Reward MAE: 0.9427, Reward RMSE: 5.2262, Reward Sign Acc: 0.905
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_022607_epoch_180.pt
+[WorldModel] Epoch 181, train_loss=21.1802
+[WorldModel] Epoch 182, train_loss=20.6196
+[WorldModel] Epoch 183, train_loss=21.2842
+[WorldModel] Epoch 184, train_loss=21.3649
+[WorldModel] Epoch 185, train_loss=20.3569, val_loss=37.1622
+  Validation Metrics - Obs MAE: 0.0341, Obs RMSE: 0.0654
+  Reward MAE: 0.9782, Reward RMSE: 5.4812, Reward Sign Acc: 0.904
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_023318_epoch_185.pt
+[WorldModel] Epoch 186, train_loss=20.7509
+[WorldModel] Epoch 187, train_loss=20.8806
+[WorldModel] Epoch 188, train_loss=20.9201
+[WorldModel] Epoch 189, train_loss=21.5607
+[WorldModel] Epoch 190, train_loss=21.1371, val_loss=38.4880
+  Validation Metrics - Obs MAE: 0.0284, Obs RMSE: 0.0587
+  Reward MAE: 1.0330, Reward RMSE: 5.5804, Reward Sign Acc: 0.902
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_024024_epoch_190.pt
+[WorldModel] Epoch 191, train_loss=20.4306
+[WorldModel] Epoch 192, train_loss=21.1976
+[WorldModel] Epoch 193, train_loss=21.8761
+[WorldModel] Epoch 194, train_loss=21.2988
+[WorldModel] Epoch 195, train_loss=21.0100, val_loss=37.4871
+  Validation Metrics - Obs MAE: 0.0308, Obs RMSE: 0.0602
+  Reward MAE: 1.0431, Reward RMSE: 5.4925, Reward Sign Acc: 0.906
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_024733_epoch_195.pt
+[WorldModel] Epoch 196, train_loss=20.9877
+[WorldModel] Epoch 197, train_loss=20.4624
+[WorldModel] Epoch 198, train_loss=19.9785
+[WorldModel] Epoch 199, train_loss=21.0014
+[WorldModel] Epoch 200, train_loss=20.5104, val_loss=40.3525
+  Validation Metrics - Obs MAE: 0.0289, Obs RMSE: 0.0598
+  Reward MAE: 1.0472, Reward RMSE: 5.7149, Reward Sign Acc: 0.908
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_025443_epoch_200.pt
+[WorldModel] Epoch 201, train_loss=20.3583
+[WorldModel] Epoch 202, train_loss=20.6659
+[WorldModel] Epoch 203, train_loss=20.1853
+[WorldModel] Epoch 204, train_loss=20.2459
+[WorldModel] Epoch 205, train_loss=21.2430, val_loss=36.1987
+  Validation Metrics - Obs MAE: 0.0291, Obs RMSE: 0.0586
+  Reward MAE: 0.9634, Reward RMSE: 5.4083, Reward Sign Acc: 0.905
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_030154_epoch_205.pt
+[WorldModel] Epoch 206, train_loss=20.6601
+[WorldModel] Epoch 207, train_loss=20.5651
+[WorldModel] Epoch 208, train_loss=20.1652
+[WorldModel] Epoch 209, train_loss=19.9415
+[WorldModel] Epoch 210, train_loss=20.9847, val_loss=35.4325
+  Validation Metrics - Obs MAE: 0.0313, Obs RMSE: 0.0615
+  Reward MAE: 0.9957, Reward RMSE: 5.3423, Reward Sign Acc: 0.901
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_030904_epoch_210.pt
+[WorldModel] Epoch 211, train_loss=20.9061
+[WorldModel] Epoch 212, train_loss=20.8124
+[WorldModel] Epoch 213, train_loss=20.4789
+[WorldModel] Epoch 214, train_loss=20.1188
+[WorldModel] Epoch 215, train_loss=20.1579, val_loss=38.3476
+  Validation Metrics - Obs MAE: 0.0300, Obs RMSE: 0.0614
+  Reward MAE: 1.0364, Reward RMSE: 5.5659, Reward Sign Acc: 0.909
+  Done Acc: 0.996
+Saved checkpoint: checkpoints\world_model_20260826_031612_epoch_215.pt
+[WorldModel] Epoch 216, train_loss=19.7838
+[WorldModel] Epoch 217, train_loss=20.2415
+[WorldModel] Epoch 218, train_loss=20.3382
+[WorldModel] Epoch 219, train_loss=19.2830
+[WorldModel] Epoch 220, train_loss=20.2647, val_loss=33.8043
+  Validation Metrics - Obs MAE: 0.0293, Obs RMSE: 0.0614
+  Reward MAE: 0.9934, Reward RMSE: 5.2188, Reward Sign Acc: 0.908
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_032321_epoch_220.pt
+[WorldModel] Epoch 221, train_loss=19.8648
+[WorldModel] Epoch 222, train_loss=20.6320
+[WorldModel] Epoch 223, train_loss=20.0686
+[WorldModel] Epoch 224, train_loss=19.7622
+[WorldModel] Epoch 225, train_loss=20.4584, val_loss=34.9375
+  Validation Metrics - Obs MAE: 0.0288, Obs RMSE: 0.0594
+  Reward MAE: 0.9867, Reward RMSE: 5.2985, Reward Sign Acc: 0.906
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_033024_epoch_225.pt
+[WorldModel] Epoch 226, train_loss=19.2353
+[WorldModel] Epoch 227, train_loss=19.3801
+[WorldModel] Epoch 228, train_loss=20.1457
+[WorldModel] Epoch 229, train_loss=20.1819
+[WorldModel] Epoch 230, train_loss=21.2911, val_loss=35.2369
+  Validation Metrics - Obs MAE: 0.0288, Obs RMSE: 0.0581
+  Reward MAE: 0.9917, Reward RMSE: 5.3307, Reward Sign Acc: 0.907
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_033637_epoch_230.pt
+[WorldModel] Epoch 231, train_loss=19.4474
+[WorldModel] Epoch 232, train_loss=20.0460
+[WorldModel] Epoch 233, train_loss=19.5067
+[WorldModel] Epoch 234, train_loss=19.6477
+[WorldModel] Epoch 235, train_loss=20.2045, val_loss=35.9713
+  Validation Metrics - Obs MAE: 0.0279, Obs RMSE: 0.0588
+  Reward MAE: 0.9640, Reward RMSE: 5.3851, Reward Sign Acc: 0.903
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_034205_epoch_235.pt
+[WorldModel] Epoch 236, train_loss=19.0141
+[WorldModel] Epoch 237, train_loss=19.8258
+[WorldModel] Epoch 238, train_loss=19.2196
+[WorldModel] Epoch 239, train_loss=19.4855
+[WorldModel] Epoch 240, train_loss=20.2448, val_loss=34.8829
+  Validation Metrics - Obs MAE: 0.0278, Obs RMSE: 0.0578
+  Reward MAE: 0.9688, Reward RMSE: 5.3041, Reward Sign Acc: 0.906
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_034732_epoch_240.pt
+[WorldModel] Epoch 241, train_loss=18.8001
+[WorldModel] Epoch 242, train_loss=19.9062
+[WorldModel] Epoch 243, train_loss=19.1258
+[WorldModel] Epoch 244, train_loss=19.2469
+[WorldModel] Epoch 245, train_loss=19.1028, val_loss=35.8816
+  Validation Metrics - Obs MAE: 0.0291, Obs RMSE: 0.0594
+  Reward MAE: 0.9614, Reward RMSE: 5.3814, Reward Sign Acc: 0.903
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_035259_epoch_245.pt
+[WorldModel] Epoch 246, train_loss=19.7450
+[WorldModel] Epoch 247, train_loss=19.3707
+[WorldModel] Epoch 248, train_loss=19.9996
+[WorldModel] Epoch 249, train_loss=18.9990
+[WorldModel] Epoch 250, train_loss=18.9224, val_loss=37.4605
+  Validation Metrics - Obs MAE: 0.0295, Obs RMSE: 0.0589
+  Reward MAE: 1.0912, Reward RMSE: 5.4963, Reward Sign Acc: 0.891
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_035827_epoch_250.pt
+[WorldModel] Epoch 251, train_loss=19.5874
+[WorldModel] Epoch 252, train_loss=18.3227
+[WorldModel] Epoch 253, train_loss=18.3027
+[WorldModel] Epoch 254, train_loss=18.7397
+[WorldModel] Epoch 255, train_loss=20.1978, val_loss=33.9822
+  Validation Metrics - Obs MAE: 0.0271, Obs RMSE: 0.0584
+  Reward MAE: 0.9545, Reward RMSE: 5.2359, Reward Sign Acc: 0.905
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_040354_epoch_255.pt
+[WorldModel] Epoch 256, train_loss=19.0056
+[WorldModel] Epoch 257, train_loss=18.6521
+[WorldModel] Epoch 258, train_loss=18.7013
+[WorldModel] Epoch 259, train_loss=19.5537
+[WorldModel] Epoch 260, train_loss=19.6000, val_loss=36.8533
+  Validation Metrics - Obs MAE: 0.0272, Obs RMSE: 0.0567
+  Reward MAE: 1.0089, Reward RMSE: 5.4584, Reward Sign Acc: 0.903
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_040922_epoch_260.pt
+[WorldModel] Epoch 261, train_loss=19.0403
+[WorldModel] Epoch 262, train_loss=19.2441
+[WorldModel] Epoch 263, train_loss=19.3581
+[WorldModel] Epoch 264, train_loss=18.6547
+[WorldModel] Epoch 265, train_loss=19.6529, val_loss=35.8540
+  Validation Metrics - Obs MAE: 0.0270, Obs RMSE: 0.0571
+  Reward MAE: 0.9599, Reward RMSE: 5.3839, Reward Sign Acc: 0.910
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_041449_epoch_265.pt
+[WorldModel] Epoch 266, train_loss=18.6707
+[WorldModel] Epoch 267, train_loss=19.2696
+[WorldModel] Epoch 268, train_loss=18.7073
+[WorldModel] Epoch 269, train_loss=18.9708
+[WorldModel] Epoch 270, train_loss=19.1818, val_loss=34.7852
+  Validation Metrics - Obs MAE: 0.0275, Obs RMSE: 0.0572
+  Reward MAE: 0.9365, Reward RMSE: 5.3017, Reward Sign Acc: 0.907
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_042017_epoch_270.pt
+[WorldModel] Epoch 271, train_loss=19.4081
+[WorldModel] Epoch 272, train_loss=19.0402
+[WorldModel] Epoch 273, train_loss=18.7482
+[WorldModel] Epoch 274, train_loss=18.7001
+[WorldModel] Epoch 275, train_loss=19.8140, val_loss=33.5824
+  Validation Metrics - Obs MAE: 0.0279, Obs RMSE: 0.0567
+  Reward MAE: 0.9302, Reward RMSE: 5.2000, Reward Sign Acc: 0.906
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_042544_epoch_275.pt
+[WorldModel] Epoch 276, train_loss=19.0450
+[WorldModel] Epoch 277, train_loss=19.0261
+[WorldModel] Epoch 278, train_loss=19.0702
+[WorldModel] Epoch 279, train_loss=19.3367
+[WorldModel] Epoch 280, train_loss=18.6763, val_loss=35.1545
+  Validation Metrics - Obs MAE: 0.0277, Obs RMSE: 0.0571
+  Reward MAE: 0.9238, Reward RMSE: 5.3263, Reward Sign Acc: 0.906
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_043111_epoch_280.pt
+[WorldModel] Epoch 281, train_loss=18.7389
+[WorldModel] Epoch 282, train_loss=19.1209
+[WorldModel] Epoch 283, train_loss=19.1855
+[WorldModel] Epoch 284, train_loss=18.8349
+[WorldModel] Epoch 285, train_loss=19.3810, val_loss=33.8187
+  Validation Metrics - Obs MAE: 0.0271, Obs RMSE: 0.0582
+  Reward MAE: 0.8992, Reward RMSE: 5.2239, Reward Sign Acc: 0.911
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_043638_epoch_285.pt
+[WorldModel] Epoch 286, train_loss=18.3210
+[WorldModel] Epoch 287, train_loss=18.2035
+[WorldModel] Epoch 288, train_loss=19.0843
+[WorldModel] Epoch 289, train_loss=18.4522
+[WorldModel] Epoch 290, train_loss=18.8530, val_loss=35.0465
+  Validation Metrics - Obs MAE: 0.0260, Obs RMSE: 0.0550
+  Reward MAE: 0.9509, Reward RMSE: 5.3175, Reward Sign Acc: 0.910
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_044206_epoch_290.pt
+[WorldModel] Epoch 291, train_loss=18.4395
+[WorldModel] Epoch 292, train_loss=18.7576
+[WorldModel] Epoch 293, train_loss=18.3269
+[WorldModel] Epoch 294, train_loss=18.2364
+[WorldModel] Epoch 295, train_loss=19.3710, val_loss=35.4626
+  Validation Metrics - Obs MAE: 0.0265, Obs RMSE: 0.0572
+  Reward MAE: 0.9567, Reward RMSE: 5.3495, Reward Sign Acc: 0.904
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_044734_epoch_295.pt
+[WorldModel] Epoch 296, train_loss=19.0334
+[WorldModel] Epoch 297, train_loss=18.6351
+[WorldModel] Epoch 298, train_loss=18.6655
+[WorldModel] Epoch 299, train_loss=18.1797
+[WorldModel] Epoch 300, train_loss=19.0508, val_loss=33.9533
+  Validation Metrics - Obs MAE: 0.0264, Obs RMSE: 0.0562
+  Reward MAE: 0.9497, Reward RMSE: 5.2351, Reward Sign Acc: 0.911
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_045301_epoch_300.pt
+[WorldModel] Epoch 301, train_loss=19.0236
+[WorldModel] Epoch 302, train_loss=18.1669
+[WorldModel] Epoch 303, train_loss=18.6525
+[WorldModel] Epoch 304, train_loss=18.3347
+[WorldModel] Epoch 305, train_loss=18.1128, val_loss=33.2762
+  Validation Metrics - Obs MAE: 0.0269, Obs RMSE: 0.0562
+  Reward MAE: 0.8985, Reward RMSE: 5.1812, Reward Sign Acc: 0.911
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_045828_epoch_305.pt
+[WorldModel] Epoch 306, train_loss=18.0560
+[WorldModel] Epoch 307, train_loss=19.0230
+[WorldModel] Epoch 308, train_loss=18.8714
+[WorldModel] Epoch 309, train_loss=19.1862
+[WorldModel] Epoch 310, train_loss=17.7743, val_loss=32.7550
+  Validation Metrics - Obs MAE: 0.0257, Obs RMSE: 0.0565
+  Reward MAE: 0.9141, Reward RMSE: 5.1400, Reward Sign Acc: 0.904
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_050355_epoch_310.pt
+[WorldModel] Epoch 311, train_loss=18.2103
+[WorldModel] Epoch 312, train_loss=18.5359
+[WorldModel] Epoch 313, train_loss=18.1799
+[WorldModel] Epoch 314, train_loss=18.7611
+[WorldModel] Epoch 315, train_loss=17.8010, val_loss=37.0221
+  Validation Metrics - Obs MAE: 0.0260, Obs RMSE: 0.0561
+  Reward MAE: 0.9548, Reward RMSE: 5.4694, Reward Sign Acc: 0.911
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_050922_epoch_315.pt
+[WorldModel] Epoch 316, train_loss=18.2813
+[WorldModel] Epoch 317, train_loss=18.1237
+[WorldModel] Epoch 318, train_loss=19.0265
+[WorldModel] Epoch 319, train_loss=18.6592
+[WorldModel] Epoch 320, train_loss=18.4978, val_loss=36.7157
+  Validation Metrics - Obs MAE: 0.0268, Obs RMSE: 0.0558
+  Reward MAE: 0.9298, Reward RMSE: 5.4485, Reward Sign Acc: 0.910
+  Done Acc: 0.996
+Saved checkpoint: checkpoints\world_model_20260826_051449_epoch_320.pt
+[WorldModel] Epoch 321, train_loss=18.9505
+[WorldModel] Epoch 322, train_loss=18.1654
+[WorldModel] Epoch 323, train_loss=17.7164
+[WorldModel] Epoch 324, train_loss=18.4719
+[WorldModel] Epoch 325, train_loss=17.6705, val_loss=35.3924
+  Validation Metrics - Obs MAE: 0.0279, Obs RMSE: 0.0576
+  Reward MAE: 0.9202, Reward RMSE: 5.3470, Reward Sign Acc: 0.908
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_052016_epoch_325.pt
+[WorldModel] Epoch 326, train_loss=18.5259
+[WorldModel] Epoch 327, train_loss=18.2135
+[WorldModel] Epoch 328, train_loss=18.8746
+[WorldModel] Epoch 329, train_loss=17.4473
+[WorldModel] Epoch 330, train_loss=18.5605, val_loss=34.7246
+  Validation Metrics - Obs MAE: 0.0252, Obs RMSE: 0.0563
+  Reward MAE: 0.9777, Reward RMSE: 5.2943, Reward Sign Acc: 0.912
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_052544_epoch_330.pt
+[WorldModel] Epoch 331, train_loss=18.0529
+[WorldModel] Epoch 332, train_loss=18.7094
+[WorldModel] Epoch 333, train_loss=17.9822
+[WorldModel] Epoch 334, train_loss=18.2963
+[WorldModel] Epoch 335, train_loss=18.2201, val_loss=31.3424
+  Validation Metrics - Obs MAE: 0.0255, Obs RMSE: 0.0555
+  Reward MAE: 0.8495, Reward RMSE: 5.0201, Reward Sign Acc: 0.910
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_053111_epoch_335.pt
+[WorldModel] Epoch 336, train_loss=17.5224
+[WorldModel] Epoch 337, train_loss=18.4041
+[WorldModel] Epoch 338, train_loss=18.3898
+[WorldModel] Epoch 339, train_loss=18.2905
+[WorldModel] Epoch 340, train_loss=17.3152, val_loss=34.5442
+  Validation Metrics - Obs MAE: 0.0254, Obs RMSE: 0.0543
+  Reward MAE: 0.8922, Reward RMSE: 5.2817, Reward Sign Acc: 0.907
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_053638_epoch_340.pt
+[WorldModel] Epoch 341, train_loss=18.6276
+[WorldModel] Epoch 342, train_loss=18.2004
+[WorldModel] Epoch 343, train_loss=18.1263
+[WorldModel] Epoch 344, train_loss=18.1751
+[WorldModel] Epoch 345, train_loss=18.0174, val_loss=33.1961
+  Validation Metrics - Obs MAE: 0.0250, Obs RMSE: 0.0562
+  Reward MAE: 0.8559, Reward RMSE: 5.1781, Reward Sign Acc: 0.912
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_054205_epoch_345.pt
+[WorldModel] Epoch 346, train_loss=18.6433
+[WorldModel] Epoch 347, train_loss=18.9554
+[WorldModel] Epoch 348, train_loss=17.4963
+[WorldModel] Epoch 349, train_loss=19.1152
+[WorldModel] Epoch 350, train_loss=18.0668, val_loss=33.5645
+  Validation Metrics - Obs MAE: 0.0270, Obs RMSE: 0.0579
+  Reward MAE: 0.9512, Reward RMSE: 5.2030, Reward Sign Acc: 0.903
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_054732_epoch_350.pt
+[WorldModel] Epoch 351, train_loss=17.6492
+[WorldModel] Epoch 352, train_loss=18.2187
+[WorldModel] Epoch 353, train_loss=17.7507
+[WorldModel] Epoch 354, train_loss=17.4642
+[WorldModel] Epoch 355, train_loss=18.1652, val_loss=32.6120
+  Validation Metrics - Obs MAE: 0.0275, Obs RMSE: 0.0556
+  Reward MAE: 0.8999, Reward RMSE: 5.1303, Reward Sign Acc: 0.912
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_055259_epoch_355.pt
+[WorldModel] Epoch 356, train_loss=17.5086
+[WorldModel] Epoch 357, train_loss=17.3628
+[WorldModel] Epoch 358, train_loss=17.6898
+[WorldModel] Epoch 359, train_loss=16.9097
+[WorldModel] Epoch 360, train_loss=16.8369, val_loss=33.7088
+  Validation Metrics - Obs MAE: 0.0259, Obs RMSE: 0.0559
+  Reward MAE: 0.8912, Reward RMSE: 5.2137, Reward Sign Acc: 0.911
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_055827_epoch_360.pt
+[WorldModel] Epoch 361, train_loss=17.6319
+[WorldModel] Epoch 362, train_loss=18.2510
+[WorldModel] Epoch 363, train_loss=16.9964
+[WorldModel] Epoch 364, train_loss=17.7965
+[WorldModel] Epoch 365, train_loss=17.9105, val_loss=33.5256
+  Validation Metrics - Obs MAE: 0.0253, Obs RMSE: 0.0557
+  Reward MAE: 0.8935, Reward RMSE: 5.2014, Reward Sign Acc: 0.909
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_060355_epoch_365.pt
+[WorldModel] Epoch 366, train_loss=17.2165
+[WorldModel] Epoch 367, train_loss=17.4276
+[WorldModel] Epoch 368, train_loss=16.4799
+[WorldModel] Epoch 369, train_loss=18.0964
+[WorldModel] Epoch 370, train_loss=18.5921, val_loss=32.6412
+  Validation Metrics - Obs MAE: 0.0251, Obs RMSE: 0.0567
+  Reward MAE: 0.8661, Reward RMSE: 5.1307, Reward Sign Acc: 0.912
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_060923_epoch_370.pt
+[WorldModel] Epoch 371, train_loss=17.7725
+[WorldModel] Epoch 372, train_loss=17.8048
+[WorldModel] Epoch 373, train_loss=17.8135
+[WorldModel] Epoch 374, train_loss=18.0955
+[WorldModel] Epoch 375, train_loss=18.2605, val_loss=33.7760
+  Validation Metrics - Obs MAE: 0.0251, Obs RMSE: 0.0545
+  Reward MAE: 0.8936, Reward RMSE: 5.2165, Reward Sign Acc: 0.916
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_061451_epoch_375.pt
+[WorldModel] Epoch 376, train_loss=17.5161
+[WorldModel] Epoch 377, train_loss=16.6435
+[WorldModel] Epoch 378, train_loss=16.5520
+[WorldModel] Epoch 379, train_loss=17.4441
+[WorldModel] Epoch 380, train_loss=17.0646, val_loss=33.4084
+  Validation Metrics - Obs MAE: 0.0254, Obs RMSE: 0.0557
+  Reward MAE: 0.9017, Reward RMSE: 5.1880, Reward Sign Acc: 0.912
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_062019_epoch_380.pt
+[WorldModel] Epoch 381, train_loss=17.4619
+[WorldModel] Epoch 382, train_loss=17.7352
+[WorldModel] Epoch 383, train_loss=17.1934
+[WorldModel] Epoch 384, train_loss=17.5310
+[WorldModel] Epoch 385, train_loss=18.3877, val_loss=32.2129
+  Validation Metrics - Obs MAE: 0.0252, Obs RMSE: 0.0550
+  Reward MAE: 0.8822, Reward RMSE: 5.0951, Reward Sign Acc: 0.910
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_062547_epoch_385.pt
+[WorldModel] Epoch 386, train_loss=17.3020
+[WorldModel] Epoch 387, train_loss=16.0546
+[WorldModel] Epoch 388, train_loss=17.6336
+[WorldModel] Epoch 389, train_loss=16.0288
+[WorldModel] Epoch 390, train_loss=16.7330, val_loss=33.7956
+  Validation Metrics - Obs MAE: 0.0262, Obs RMSE: 0.0563
+  Reward MAE: 0.9199, Reward RMSE: 5.2200, Reward Sign Acc: 0.914
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_063115_epoch_390.pt
+[WorldModel] Epoch 391, train_loss=17.6700
+[WorldModel] Epoch 392, train_loss=16.7001
+[WorldModel] Epoch 393, train_loss=16.5092
+[WorldModel] Epoch 394, train_loss=16.5062
+[WorldModel] Epoch 395, train_loss=17.1487, val_loss=34.2321
+  Validation Metrics - Obs MAE: 0.0255, Obs RMSE: 0.0547
+  Reward MAE: 0.9367, Reward RMSE: 5.2540, Reward Sign Acc: 0.909
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_063642_epoch_395.pt
+[WorldModel] Epoch 396, train_loss=16.6720
+[WorldModel] Epoch 397, train_loss=16.3462
+[WorldModel] Epoch 398, train_loss=16.5651
+[WorldModel] Epoch 399, train_loss=16.1209
+[WorldModel] Epoch 400, train_loss=17.0017, val_loss=33.0619
+  Validation Metrics - Obs MAE: 0.0245, Obs RMSE: 0.0547
+  Reward MAE: 0.8814, Reward RMSE: 5.1671, Reward Sign Acc: 0.911
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_064210_epoch_400.pt
+[WorldModel] Epoch 401, train_loss=16.3796
+[WorldModel] Epoch 402, train_loss=17.1598
+[WorldModel] Epoch 403, train_loss=16.6816
+[WorldModel] Epoch 404, train_loss=15.7671
+[WorldModel] Epoch 405, train_loss=16.6905, val_loss=35.8358
+  Validation Metrics - Obs MAE: 0.0246, Obs RMSE: 0.0549
+  Reward MAE: 0.9350, Reward RMSE: 5.3785, Reward Sign Acc: 0.914
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_064738_epoch_405.pt
+[WorldModel] Epoch 406, train_loss=16.5023
+[WorldModel] Epoch 407, train_loss=16.8679
+[WorldModel] Epoch 408, train_loss=17.4704
+[WorldModel] Epoch 409, train_loss=17.4422
+[WorldModel] Epoch 410, train_loss=16.0094, val_loss=34.5786
+  Validation Metrics - Obs MAE: 0.0259, Obs RMSE: 0.0556
+  Reward MAE: 0.8937, Reward RMSE: 5.2845, Reward Sign Acc: 0.911
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_065306_epoch_410.pt
+[WorldModel] Epoch 411, train_loss=16.2856
+[WorldModel] Epoch 412, train_loss=16.7290
+[WorldModel] Epoch 413, train_loss=16.5669
+[WorldModel] Epoch 414, train_loss=16.8685
+[WorldModel] Epoch 415, train_loss=16.1177, val_loss=34.5690
+  Validation Metrics - Obs MAE: 0.0244, Obs RMSE: 0.0545
+  Reward MAE: 0.8866, Reward RMSE: 5.2839, Reward Sign Acc: 0.911
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_065834_epoch_415.pt
+[WorldModel] Epoch 416, train_loss=16.2618
+[WorldModel] Epoch 417, train_loss=17.2361
+[WorldModel] Epoch 418, train_loss=16.9744
+[WorldModel] Epoch 419, train_loss=16.1246
+[WorldModel] Epoch 420, train_loss=16.5531, val_loss=33.3051
+  Validation Metrics - Obs MAE: 0.0262, Obs RMSE: 0.0578
+  Reward MAE: 0.9038, Reward RMSE: 5.1773, Reward Sign Acc: 0.911
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_070401_epoch_420.pt
+[WorldModel] Epoch 421, train_loss=15.8137
+[WorldModel] Epoch 422, train_loss=16.6562
+[WorldModel] Epoch 423, train_loss=16.7480
+[WorldModel] Epoch 424, train_loss=16.6039
+[WorldModel] Epoch 425, train_loss=16.9385, val_loss=35.5181
+  Validation Metrics - Obs MAE: 0.0262, Obs RMSE: 0.0565
+  Reward MAE: 0.8957, Reward RMSE: 5.3543, Reward Sign Acc: 0.910
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_070929_epoch_425.pt
+[WorldModel] Epoch 426, train_loss=16.1058
+[WorldModel] Epoch 427, train_loss=17.4186
+[WorldModel] Epoch 428, train_loss=16.0610
+[WorldModel] Epoch 429, train_loss=16.5422
+[WorldModel] Epoch 430, train_loss=16.8713, val_loss=31.5535
+  Validation Metrics - Obs MAE: 0.0258, Obs RMSE: 0.0565
+  Reward MAE: 0.8546, Reward RMSE: 5.0378, Reward Sign Acc: 0.912
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_071457_epoch_430.pt
+[WorldModel] Epoch 431, train_loss=16.2599
+[WorldModel] Epoch 432, train_loss=16.9853
+[WorldModel] Epoch 433, train_loss=16.3926
+[WorldModel] Epoch 434, train_loss=16.8064
+[WorldModel] Epoch 435, train_loss=17.1361, val_loss=34.0145
+  Validation Metrics - Obs MAE: 0.0246, Obs RMSE: 0.0553
+  Reward MAE: 0.8801, Reward RMSE: 5.2386, Reward Sign Acc: 0.912
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_072025_epoch_435.pt
+[WorldModel] Epoch 436, train_loss=16.4052
+[WorldModel] Epoch 437, train_loss=16.5669
+[WorldModel] Epoch 438, train_loss=16.0421
+[WorldModel] Epoch 439, train_loss=16.2907
+[WorldModel] Epoch 440, train_loss=15.6842, val_loss=33.6338
+  Validation Metrics - Obs MAE: 0.0247, Obs RMSE: 0.0551
+  Reward MAE: 0.8587, Reward RMSE: 5.2117, Reward Sign Acc: 0.910
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_072553_epoch_440.pt
+[WorldModel] Epoch 441, train_loss=15.9381
+[WorldModel] Epoch 442, train_loss=15.8258
+[WorldModel] Epoch 443, train_loss=16.2615
+[WorldModel] Epoch 444, train_loss=15.1968
+[WorldModel] Epoch 445, train_loss=16.2668, val_loss=31.8735
+  Validation Metrics - Obs MAE: 0.0245, Obs RMSE: 0.0560
+  Reward MAE: 0.8445, Reward RMSE: 5.0621, Reward Sign Acc: 0.912
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_073121_epoch_445.pt
+[WorldModel] Epoch 446, train_loss=15.3037
+[WorldModel] Epoch 447, train_loss=16.1416
+[WorldModel] Epoch 448, train_loss=15.6693
+[WorldModel] Epoch 449, train_loss=16.4481
+[WorldModel] Epoch 450, train_loss=15.7501, val_loss=33.5354
+  Validation Metrics - Obs MAE: 0.0275, Obs RMSE: 0.0592
+  Reward MAE: 0.9049, Reward RMSE: 5.1998, Reward Sign Acc: 0.909
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_073648_epoch_450.pt
+[WorldModel] Epoch 451, train_loss=16.4067
+[WorldModel] Epoch 452, train_loss=16.3297
+[WorldModel] Epoch 453, train_loss=16.8826
+[WorldModel] Epoch 454, train_loss=16.3217
+[WorldModel] Epoch 455, train_loss=15.6319, val_loss=33.6172
+  Validation Metrics - Obs MAE: 0.0243, Obs RMSE: 0.0547
+  Reward MAE: 0.8961, Reward RMSE: 5.2053, Reward Sign Acc: 0.911
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_074217_epoch_455.pt
+[WorldModel] Epoch 456, train_loss=15.9231
+[WorldModel] Epoch 457, train_loss=15.6278
+[WorldModel] Epoch 458, train_loss=15.4854
+[WorldModel] Epoch 459, train_loss=15.9933
+[WorldModel] Epoch 460, train_loss=15.6911, val_loss=30.1965
+  Validation Metrics - Obs MAE: 0.0236, Obs RMSE: 0.0558
+  Reward MAE: 0.8221, Reward RMSE: 4.9288, Reward Sign Acc: 0.914
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_074745_epoch_460.pt
+[WorldModel] Epoch 461, train_loss=15.0944
+[WorldModel] Epoch 462, train_loss=15.6827
+[WorldModel] Epoch 463, train_loss=15.2766
+[WorldModel] Epoch 464, train_loss=16.3112
+[WorldModel] Epoch 465, train_loss=16.4554, val_loss=30.1668
+  Validation Metrics - Obs MAE: 0.0249, Obs RMSE: 0.0564
+  Reward MAE: 0.8246, Reward RMSE: 4.9304, Reward Sign Acc: 0.909
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_075312_epoch_465.pt
+[WorldModel] Epoch 466, train_loss=16.0612
+[WorldModel] Epoch 467, train_loss=15.6656
+[WorldModel] Epoch 468, train_loss=15.7310
+[WorldModel] Epoch 469, train_loss=16.2102
+[WorldModel] Epoch 470, train_loss=15.5815, val_loss=32.2561
+  Validation Metrics - Obs MAE: 0.0238, Obs RMSE: 0.0533
+  Reward MAE: 0.8472, Reward RMSE: 5.0935, Reward Sign Acc: 0.908
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_075840_epoch_470.pt
+[WorldModel] Epoch 471, train_loss=15.8935
+[WorldModel] Epoch 472, train_loss=15.2379
+[WorldModel] Epoch 473, train_loss=15.6339
+[WorldModel] Epoch 474, train_loss=17.1866
+[WorldModel] Epoch 475, train_loss=15.6879, val_loss=32.4482
+  Validation Metrics - Obs MAE: 0.0244, Obs RMSE: 0.0560
+  Reward MAE: 0.8492, Reward RMSE: 5.1134, Reward Sign Acc: 0.910
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_080409_epoch_475.pt
+[WorldModel] Epoch 476, train_loss=16.3206
+[WorldModel] Epoch 477, train_loss=15.6060
+[WorldModel] Epoch 478, train_loss=15.7989
+[WorldModel] Epoch 479, train_loss=15.5789
+[WorldModel] Epoch 480, train_loss=15.3048, val_loss=30.5034
+  Validation Metrics - Obs MAE: 0.0245, Obs RMSE: 0.0546
+  Reward MAE: 0.8285, Reward RMSE: 4.9549, Reward Sign Acc: 0.913
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_080936_epoch_480.pt
+[WorldModel] Epoch 481, train_loss=16.2864
+[WorldModel] Epoch 482, train_loss=15.3188
+[WorldModel] Epoch 483, train_loss=15.9424
+[WorldModel] Epoch 484, train_loss=15.5611
+[WorldModel] Epoch 485, train_loss=14.9724, val_loss=31.2054
+  Validation Metrics - Obs MAE: 0.0240, Obs RMSE: 0.0552
+  Reward MAE: 0.8421, Reward RMSE: 5.0146, Reward Sign Acc: 0.913
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_081505_epoch_485.pt
+[WorldModel] Epoch 486, train_loss=15.0325
+[WorldModel] Epoch 487, train_loss=15.1971
+[WorldModel] Epoch 488, train_loss=15.9501
+[WorldModel] Epoch 489, train_loss=15.4569
+[WorldModel] Epoch 490, train_loss=15.0779, val_loss=31.3456
+  Validation Metrics - Obs MAE: 0.0249, Obs RMSE: 0.0563
+  Reward MAE: 0.8502, Reward RMSE: 5.0241, Reward Sign Acc: 0.910
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_082032_epoch_490.pt
+[WorldModel] Epoch 491, train_loss=15.6496
+[WorldModel] Epoch 492, train_loss=15.9794
+[WorldModel] Epoch 493, train_loss=15.6125
+[WorldModel] Epoch 494, train_loss=14.9850
+[WorldModel] Epoch 495, train_loss=15.5322, val_loss=33.8459
+  Validation Metrics - Obs MAE: 0.0255, Obs RMSE: 0.0560
+  Reward MAE: 0.8647, Reward RMSE: 5.2203, Reward Sign Acc: 0.912
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_082600_epoch_495.pt
+[WorldModel] Epoch 496, train_loss=14.8261
+[WorldModel] Epoch 497, train_loss=15.8333
+[WorldModel] Epoch 498, train_loss=15.7110
+[WorldModel] Epoch 499, train_loss=15.9249
+[WorldModel] Epoch 500, train_loss=15.4414, val_loss=30.6546
+  Validation Metrics - Obs MAE: 0.0255, Obs RMSE: 0.0539
+  Reward MAE: 0.8187, Reward RMSE: 4.9675, Reward Sign Acc: 0.910
+  Done Acc: 0.997
+Saved checkpoint: checkpoints\world_model_20260826_083128_epoch_500.pt

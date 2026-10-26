@@ -1,7 +1,7 @@
 """Summarise the held-out runs in Table 2's columns, next to the held-out A2C runs of Table 1.
 
-    python eval_scripts/summarize_heldout.py
-    python eval_scripts/summarize_heldout.py --ts 20261014_143234 20261014_223629
+    python paper/scripts/summarize_heldout.py
+    python paper/scripts/summarize_heldout.py --ts 20261014_143234 20261014_223629
 
 Reads the logs eval_heldout.ps1 writes to logs/eval_heldout/
 (heldout_<session>_<policy>_seed<seed>_n<episodes>.txt), taking the latest
@@ -17,7 +17,7 @@ from pathlib import Path
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 HELDOUT = ROOT / "logs" / "eval_heldout"
 WMAC = "WM-AC (WM 280, A2C ep 800)"
 MFAC = "MF-AC (ep 760), 1000-step cap"

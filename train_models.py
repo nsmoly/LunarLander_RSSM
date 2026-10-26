@@ -767,6 +767,7 @@ def main():
         hidden_dim = capacity.get('hidden_dim', 256)
         mlp_hidden_dim = capacity.get('mlp_hidden_dim', hidden_dim)
         gru_num_layers = int(capacity.get('gru_num_layers', 1))
+        reward_z_only = str(phase_config.get('reward_head_input', 'hz')).lower() == 'z'
 
         world_model = WorldModel(
             obs_dim,
@@ -775,6 +776,7 @@ def main():
             hidden_dim=hidden_dim,
             gru_num_layers=gru_num_layers,
             mlp_hidden_dim=mlp_hidden_dim,
+            reward_z_only=reward_z_only,
         ).to(DEVICE)
 
         latest_checkpoint = get_latest_checkpoint("world_model")
@@ -817,7 +819,9 @@ def main():
         )
         log_message(
             f"Model capacity: latent_dim={latent_dim}, hidden_dim={hidden_dim}, "
-            f"mlp_hidden_dim={mlp_hidden_dim}, gru_num_layers={gru_num_layers}",
+            f"mlp_hidden_dim={mlp_hidden_dim}, gru_num_layers={gru_num_layers}, "
+            f"reward_head_input={'z' if reward_z_only else 'hz'} "
+            f"(in_features={world_model.reward_head[0].in_features})",
             log_path,
         )
         log_message(

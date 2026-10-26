@@ -148,6 +148,7 @@ class WorldModel(nn.Module):
         hidden_dim=256,
         gru_num_layers=1,
         mlp_hidden_dim=None,
+        reward_z_only=False,
     ):
         super().__init__()
         self.obs_dim = obs_dim
@@ -187,6 +188,39 @@ class WorldModel(nn.Module):
             nn.Linear(self.mlp_hidden_dim, 1),
         )
 
+        self.reward_z_only = False
+        if reward_z_only:
+            self.set_reward_head_input(z_only=True)
+
+    def set_reward_head_input(self, z_only):
+        """Rebuild reward_head[0] to read either [h, z] or z alone.
+
+        Ablation for the reward-migration hypothesis: with h removed, reward can
+        only be computed from the latent the posterior corrects.
+
+        Done by replacing the layer after __init__ has built the full head rather
+        than by sizing it up front, so every other module consumes the same RNG
+        draws a standard run with this seed would, leaving the two arms with
+        identical initial weights everywhere except this layer.
+        """
+        in_dim = self.rssm.latent_dim
+        if not z_only:
+            in_dim += self.rssm.hidden_dim
+        old = self.reward_head[0]
+        if old.in_features != in_dim:
+            self.reward_head[0] = nn.Linear(in_dim, self.mlp_hidden_dim).to(
+                device=old.weight.device, dtype=old.weight.dtype
+            )
+        self.reward_z_only = bool(z_only)
+
+    def load_state_dict(self, state_dict, *args, **kwargs):
+        # The reward head's input width identifies the variant, so z-only
+        # checkpoints load in every eval script without needing a flag passed in.
+        weight = state_dict.get("reward_head.0.weight")
+        if weight is not None:
+            self.set_reward_head_input(z_only=weight.shape[1] == self.rssm.latent_dim)
+        return super().load_state_dict(state_dict, *args, **kwargs)
+
     def decode_heads(self, h, z):
         x = torch.cat([self.rssm.top_hidden(h), z], dim=-1)
         feat = self.decoder_backbone(x)
@@ -204,7 +238,8 @@ class WorldModel(nn.Module):
         return self.make_obs_tensor(physics, contact_logits)
 
     def predict_reward(self, h, z):
-        return self.reward_head(torch.cat([self.rssm.top_hidden(h), z], dim=-1)).squeeze(-1)
+        x = z if self.reward_z_only else torch.cat([self.rssm.top_hidden(h), z], dim=-1)
+        return self.reward_head(x).squeeze(-1)
 
     def predict_done_logits(self, h, z):
         _, _, done_logits = self.decode_heads(h, z)
