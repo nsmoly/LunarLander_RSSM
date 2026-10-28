@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 from eval_terminal_fidelity import evaluate_run  # noqa: E402
 from parse_mpc_sweep_777 import centred_ma, parse_log  # noqa: E402
 
-CROF = ROOT.parent / "crof_reproduction"
+CROF = ROOT.parent / "rof-reproduction"
 
 RUNS = [
     dict(key="v7", label="V7 12345 cont (3080)", outcome="collapse",

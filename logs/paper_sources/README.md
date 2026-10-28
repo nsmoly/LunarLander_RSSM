@@ -31,4 +31,4 @@ Notes:
   `seed777resume` = 777-5090-A. `metrics128_*` files use 128 Jacobian states and metric seeds
   12345, 1 and 2; `metrics_*` files use 64 states and metric seed 12345.
 - `terminal_fidelity_panel.py` also reads two runs from the companion reproduction
-  repository (`../crof_reproduction`: `12345-3080-C` and `12345-3080-Z`).
+  repository (`../rof-reproduction`: `12345-3080-C` and `12345-3080-Z`).
